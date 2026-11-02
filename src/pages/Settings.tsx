@@ -81,7 +81,11 @@ export const SettingsPage: React.FC = () => {
   return (
     <div
       className="w-full h-full flex flex-col overflow-hidden"
-      style={{ backgroundColor: 'var(--bg)', color: 'var(--text)' }}
+      style={{
+        backgroundColor: 'var(--bg)',
+        backgroundImage: 'var(--ambient-glow)',
+        color: 'var(--text)',
+      }}
     >
       {/* Top Header Bar */}
       <header

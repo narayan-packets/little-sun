@@ -27,13 +27,14 @@ export const LoginScreen: React.FC = () => {
       className="w-full h-full flex items-center justify-center px-4"
       style={{
         backgroundColor: 'var(--bg)',
+        backgroundImage: 'var(--ambient-glow)',
         color: 'var(--text)',
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
       <div
-        className="w-full max-w-[380px] p-7 border"
+        className="w-full max-w-[380px] p-7 border shadow-xs"
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border)',
