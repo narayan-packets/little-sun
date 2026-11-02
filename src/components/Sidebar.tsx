@@ -68,9 +68,9 @@ export const Sidebar: React.FC = () => {
   const [showByDate, setShowByDate] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(SIDEBAR_DATE_FILTER_KEY);
-      return saved ? saved === 'true' : false;
+      return saved !== null ? saved === 'true' : true;
     } catch {
-      return false;
+      return true;
     }
   });
 
@@ -292,18 +292,17 @@ export const Sidebar: React.FC = () => {
             );
   };
 
-  const renderGroup = (label: string, items: ChatRow[], headerRight?: React.ReactNode) => {
+  const renderGroup = (label: string, items: ChatRow[]) => {
     if (items.length === 0) return null;
     return (
-      <div className="mb-4">
-        <div className="px-3 mb-1.5 min-h-[28px] flex items-center justify-between gap-2 select-none">
+      <div className="mb-3.5">
+        <div className="px-2.5 mb-1 flex items-center select-none">
           <span
             className="text-[11px] font-medium tracking-wide uppercase"
             style={{ color: 'var(--text-muted)' }}
           >
             {label}
           </span>
-          {headerRight}
         </div>
         <div className="space-y-0.5">
           {items.map((chat) => renderChatItem(chat))}
@@ -311,44 +310,6 @@ export const Sidebar: React.FC = () => {
       </div>
     );
   };
-
-  const filterButton = (
-    <button
-      type="button"
-      onClick={toggleShowByDate}
-      className="inline-flex items-center gap-1.5 min-h-[32px] px-2.5 py-1 text-xs md:min-h-[26px] md:px-2 md:py-0.5 md:text-[11px] font-medium border transition-colors cursor-pointer active:scale-[0.98]"
-      style={{
-        backgroundColor: showByDate ? 'var(--surface-2)' : 'transparent',
-        borderColor: showByDate ? 'var(--border)' : 'transparent',
-        color: showByDate ? 'var(--text)' : 'var(--text-muted)',
-        borderRadius: 'var(--radius-sm)',
-      }}
-      aria-pressed={showByDate}
-      aria-label={showByDate ? 'Show chats as list' : 'Show chats by date'}
-      title={showByDate ? 'Showing by date (click for flat list)' : 'Filter chats by date'}
-    >
-      {showByDate ? (
-        <>
-          <Calendar className="w-3.5 h-3.5 md:w-3 md:h-3 shrink-0" style={{ color: 'var(--accent)' }} />
-          <span>By date</span>
-        </>
-      ) : (
-        <>
-          <ListFilter className="w-3.5 h-3.5 md:w-3 md:h-3 shrink-0" />
-          <span>By date</span>
-        </>
-      )}
-    </button>
-  );
-
-  const firstNonEmptyGroup: 'today' | 'yesterday' | 'earlier' | null =
-    grouped.today.length > 0
-      ? 'today'
-      : grouped.yesterday.length > 0
-        ? 'yesterday'
-        : grouped.earlier.length > 0
-          ? 'earlier'
-          : null;
 
   const initialLetter = (userDisplayName.charAt(0) || 'U').toUpperCase();
 
@@ -362,8 +323,8 @@ export const Sidebar: React.FC = () => {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      {/* Top Header: Brand + Collapse + New Chat */}
-      <div className="p-3 pb-2 space-y-2.5">
+      {/* Top Header: Brand + Collapse + New Chat + Filter */}
+      <div className="p-3 pb-2 space-y-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between px-1">
           <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text)' }}>
             Little Sun
@@ -373,7 +334,7 @@ export const Sidebar: React.FC = () => {
           <button
             type="button"
             onClick={toggleDesktopSidebar}
-            className="hidden md:inline-flex min-h-[36px] min-w-[36px] items-center justify-center transition-colors cursor-pointer"
+            className="hidden md:inline-flex min-h-[36px] min-w-[36px] items-center justify-center transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
             style={{ color: 'var(--text-muted)', borderRadius: 'var(--radius-sm)' }}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
@@ -385,8 +346,8 @@ export const Sidebar: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsSidebarOpen(false)}
-            className="md:hidden min-h-[40px] min-w-[40px] inline-flex items-center justify-center cursor-pointer"
-            style={{ color: 'var(--text-muted)' }}
+            className="md:hidden min-h-[40px] min-w-[40px] inline-flex items-center justify-center cursor-pointer hover:bg-[var(--surface-2)]"
+            style={{ color: 'var(--text-muted)', borderRadius: 'var(--radius-sm)' }}
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" />
@@ -396,7 +357,7 @@ export const Sidebar: React.FC = () => {
         <button
           type="button"
           onClick={startNewChat}
-          className="w-full min-h-[42px] px-3 py-2 flex items-center justify-between gap-2 text-sm font-medium border transition-colors cursor-pointer active:scale-[0.99]"
+          className="w-full min-h-[42px] px-3 py-2 flex items-center justify-between gap-2 text-sm font-medium border transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
           style={{
             backgroundColor: 'var(--bg)',
             borderColor: 'var(--border)',
@@ -407,28 +368,60 @@ export const Sidebar: React.FC = () => {
           <span>New chat</span>
           <Plus className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
         </button>
+
+        {/* Section Header & Well-sized Filter Button */}
+        <div className="pt-0.5 flex items-center justify-between gap-2 select-none">
+          <span
+            className="text-[11px] font-semibold tracking-wider uppercase px-1"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Chats
+          </span>
+
+          <button
+            type="button"
+            onClick={toggleShowByDate}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-medium border transition-all cursor-pointer hover:bg-[var(--surface-2)] active:scale-95"
+            style={{
+              backgroundColor: showByDate ? 'var(--surface-2)' : 'transparent',
+              borderColor: showByDate ? 'var(--accent)' : 'var(--border)',
+              color: showByDate ? 'var(--text)' : 'var(--text-muted)',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            aria-pressed={showByDate}
+            aria-label={showByDate ? 'Grouped by date. Click to show as it is.' : 'Showing as it is. Click to group by date.'}
+            title={showByDate ? 'Grouped by date (Click for flat list)' : 'Showing as it is (Click to group by date)'}
+          >
+            {showByDate ? (
+              <>
+                <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+                <span>By date</span>
+              </>
+            ) : (
+              <>
+                <ListFilter className="w-3.5 h-3.5 shrink-0" />
+                <span>As it is</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Chat History List */}
-      <div className="flex-1 overflow-y-auto px-2.5 py-1.5">
+      <div className="flex-1 overflow-y-auto px-2.5 py-2">
         {chats.length === 0 ? (
           <div className="px-3 py-8 text-xs text-center" style={{ color: 'var(--text-muted)' }}>
             No conversations yet.
           </div>
         ) : showByDate ? (
-          <>
-            {renderGroup('Today', grouped.today, firstNonEmptyGroup === 'today' ? filterButton : undefined)}
-            {renderGroup('Yesterday', grouped.yesterday, firstNonEmptyGroup === 'yesterday' ? filterButton : undefined)}
-            {renderGroup('Earlier', grouped.earlier, firstNonEmptyGroup === 'earlier' ? filterButton : undefined)}
-          </>
+          <div className="space-y-3">
+            {renderGroup('Today', grouped.today)}
+            {renderGroup('Yesterday', grouped.yesterday)}
+            {renderGroup('Earlier', grouped.earlier)}
+          </div>
         ) : (
-          <div>
-            <div className="px-3 mb-1 min-h-[28px] flex items-center justify-end select-none">
-              {filterButton}
-            </div>
-            <div className="space-y-0.5">
-              {chats.map((chat) => renderChatItem(chat))}
-            </div>
+          <div className="space-y-0.5">
+            {chats.map((chat) => renderChatItem(chat))}
           </div>
         )}
       </div>
