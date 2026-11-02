@@ -47,30 +47,22 @@ import { POCKET_VOICES, type PocketVoiceId, setSavedSpeed, setSavedVoice, ttsCon
 import { isMathPrompt, sanitizeMessageListForMath, stripHallucinatedMath } from '../lib/markdown';
 
 export type LaptopUiStatus = 'offline' | 'sleeping' | 'waking' | 'ready' | 'busy';
-export type SettingsRouteSection = 'index' | 'account' | 'voices' | 'gateway';
+export type SettingsRouteSection = 'account' | 'voices';
 
 function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | null {
   const clean = pathname.replace(/\/+$/, '').toLowerCase();
-  if (clean === '/settings' || clean === '/settings/general') {
-    return 'index';
-  }
-  if (clean === '/account' || clean === '/settings/account') {
+  if (clean === '/settings' || clean === '/account' || clean === '/settings/account') {
     return 'account';
   }
   if (clean === '/voices' || clean === '/settings/voices') {
     return 'voices';
   }
-  if (clean === '/gateway' || clean === '/settings/gateway' || clean === '/models' || clean === '/settings/models') {
-    return 'gateway';
-  }
   return null;
 }
 
 function getPathForSettingsSection(section: SettingsRouteSection): string {
-  if (section === 'account') return '/account';
   if (section === 'voices') return '/voices';
-  if (section === 'gateway') return '/settings/gateway';
-  return '/settings';
+  return '/account';
 }
 
 interface FailedSendState {
@@ -254,9 +246,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [settingsSection, setSettingsSectionState] = useState<SettingsRouteSection>(() => {
     if (typeof window !== 'undefined') {
-      return parseSettingsSectionFromPath(window.location.pathname) || 'index';
+      return parseSettingsSectionFromPath(window.location.pathname) || 'account';
     }
-    return 'index';
+    return 'account';
   });
   const [isSettingsOpen, setIsSettingsOpenState] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -327,8 +319,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     (open: boolean) => {
       setIsSettingsOpenState(open);
       if (open) {
-        setSettingsSectionState('index');
-        updateBrowserUrl('/settings');
+        setSettingsSectionState('account');
+        updateBrowserUrl('/account');
       } else {
         const backPath = getActiveChatRoute(activeChatId, chats);
         updateBrowserUrl(backPath);
@@ -517,14 +509,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
     if (isSettingsOpen) {
-      if (settingsSection === 'account') {
-        document.title = 'Account · Little Sun';
-      } else if (settingsSection === 'voices') {
+      if (settingsSection === 'voices') {
         document.title = 'Voices · Little Sun';
-      } else if (settingsSection === 'gateway') {
-        document.title = 'Gateway & Model · Little Sun';
       } else {
-        document.title = 'Settings · Little Sun';
+        document.title = 'Account · Little Sun';
       }
       return;
     }
