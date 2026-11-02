@@ -1,5 +1,5 @@
--- Little Sun (V1.2) Complete Idempotent Supabase Schema & Realtime Sync
--- Safe to run on both a brand-new Supabase project or an existing V1.0/V1.1 project.
+-- Little Sun (V1.3) Complete Idempotent Supabase Schema & Realtime Sync
+-- Safe to run on both a brand-new Supabase project or an existing V1.0/V1.1/V1.2 project.
 
 -- 1. Core Tables
 create table if not exists public.chats (

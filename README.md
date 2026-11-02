@@ -1,11 +1,11 @@
-# Little Sun ☀️ (v1.2)
+# Little Sun ☀️ (v1.3)
 
 > **A calm, private intelligence workspace connecting an editorial web interface to your personal local LLM and neural voice engine.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version: 1.2.0](https://img.shields.io/badge/Version-1.2.0-orange.svg)]()
+[![Version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-orange.svg)]()
 [![React 19](https://img.shields.io/badge/React-19.0-blue.svg)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-6.x-purple.svg)](https://vitejs.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vitejs.dev/)
 [![Tailscale](https://img.shields.io/badge/Network-Tailscale_Funnel-blue.svg)](https://tailscale.com/)
 
 ---
@@ -45,7 +45,7 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
 
 ## Key Features
 
-- **📐 Interactive Math Visualizer (New in V1.2)**:
+- **📐 Interactive Math Visualizer (V1.3)**:
   - **Dynamic 2D Function Plotting**: Automatic interactive SVG curves for quadratic and linear equations with hover crosshairs and analytical point markers (roots, vertex, y-intercept, axis of symmetry).
   - **Analytical Derivations**: Step-by-step breakdown of quadratic formula, vertex coordinates, and discriminant ($\Delta$).
   - **KaTeX Mathematical Typesetting**: Beautiful inline and display rendering of algebra, calculus, matrices, and arithmetic.
