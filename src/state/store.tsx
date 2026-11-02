@@ -47,11 +47,11 @@ import { POCKET_VOICES, type PocketVoiceId, setSavedSpeed, setSavedVoice, ttsCon
 import { isMathPrompt, sanitizeMessageListForMath, stripHallucinatedMath } from '../lib/markdown';
 
 export type LaptopUiStatus = 'offline' | 'sleeping' | 'waking' | 'ready' | 'busy';
-export type SettingsRouteSection = 'index' | 'account' | 'voices';
+export type SettingsRouteSection = 'index' | 'account' | 'voices' | 'gateway';
 
 function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | null {
   const clean = pathname.replace(/\/+$/, '').toLowerCase();
-  if (clean === '/settings') {
+  if (clean === '/settings' || clean === '/settings/general') {
     return 'index';
   }
   if (clean === '/account' || clean === '/settings/account') {
@@ -60,12 +60,16 @@ function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | 
   if (clean === '/voices' || clean === '/settings/voices') {
     return 'voices';
   }
+  if (clean === '/gateway' || clean === '/settings/gateway' || clean === '/models' || clean === '/settings/models') {
+    return 'gateway';
+  }
   return null;
 }
 
 function getPathForSettingsSection(section: SettingsRouteSection): string {
   if (section === 'account') return '/account';
   if (section === 'voices') return '/voices';
+  if (section === 'gateway') return '/settings/gateway';
   return '/settings';
 }
 
@@ -517,6 +521,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         document.title = 'Account · Little Sun';
       } else if (settingsSection === 'voices') {
         document.title = 'Voices · Little Sun';
+      } else if (settingsSection === 'gateway') {
+        document.title = 'Gateway & Model · Little Sun';
       } else {
         document.title = 'Settings · Little Sun';
       }
