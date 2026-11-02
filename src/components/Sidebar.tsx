@@ -223,16 +223,24 @@ export const Sidebar: React.FC = () => {
             return (
               <div
                 key={chat.id}
-                className="group relative flex items-center transition-colors"
+                className="group relative flex items-center transition-all duration-150 ease-out hover:bg-[var(--surface-2)]"
                 style={{
                   backgroundColor: isActive ? 'var(--surface-2)' : 'transparent',
                   borderRadius: 'var(--radius-sm)',
                 }}
               >
+                {isActive && (
+                  <span
+                    className="absolute left-1 top-2.5 bottom-2.5 w-[3px] rounded-full"
+                    style={{ backgroundColor: 'var(--accent)' }}
+                    aria-hidden="true"
+                  />
+                )}
+
                 <button
                   type="button"
                   onClick={() => selectChat(chat.id)}
-                  className="flex-1 min-w-0 min-h-[42px] pl-3 pr-10 py-2 text-left text-sm truncate transition-colors cursor-pointer"
+                  className="flex-1 min-w-0 min-h-[42px] pl-3.5 pr-10 py-2 text-left text-sm truncate transition-colors cursor-pointer"
                   style={{ color: 'var(--text)' }}
                 >
                   {chat.title}

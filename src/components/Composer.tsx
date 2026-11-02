@@ -79,9 +79,9 @@ export const Composer: React.FC = () => {
 
   return (
     <div
-      className="w-full px-3 sm:px-5 pt-2 shrink-0"
+      className="w-full px-3 sm:px-5 pt-3 shrink-0 relative z-10"
       style={{
-        backgroundColor: 'var(--bg)',
+        background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 24%)',
         paddingBottom: 'calc(0.85rem + env(safe-area-inset-bottom))',
       }}
     >

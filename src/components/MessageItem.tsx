@@ -62,11 +62,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
     >
       {isUser ? (
         <div
-          className="max-w-[88%] sm:max-w-[78%] px-4 py-2.5 text-base whitespace-pre-wrap break-words"
+          className="max-w-[88%] sm:max-w-[78%] px-4 py-2.5 text-base whitespace-pre-wrap break-words border shadow-xs"
           style={{
             backgroundColor: 'var(--surface-2)',
+            borderColor: 'var(--border)',
             color: 'var(--text)',
-            borderRadius: '18px',
+            borderRadius: '18px 18px 4px 18px',
           }}
         >
           {message.content}

@@ -25,6 +25,7 @@ export const ChatView: React.FC = () => {
     toggleDesktopSidebar,
     setIsSettingsOpen,
     signOut,
+    setComposerDraft,
   } = useAppState();
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -109,6 +110,7 @@ export const ChatView: React.FC = () => {
       className="flex-1 min-w-0 flex flex-col relative overflow-hidden"
       style={{
         backgroundColor: 'var(--bg)',
+        backgroundImage: 'var(--ambient-glow)',
         height: viewportHeight,
       }}
     >
@@ -224,17 +226,53 @@ export const ChatView: React.FC = () => {
       ) : isEmpty ? (
         <motion.div
           key="new-chat-instance"
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           className="flex-1 flex flex-col items-center justify-center px-4 select-none"
         >
-          <h1
-            className="text-xl sm:text-2xl font-medium tracking-tight text-center"
-            style={{ color: 'var(--text)' }}
-          >
-            How can I help, {userDisplayName}?
-          </h1>
+          <div className="flex flex-col items-center text-center max-w-[560px] mx-auto">
+            <div className="mb-4">
+              <SunMark size={42} state="waking" animated />
+            </div>
+
+            <h1
+              className="text-2xl sm:text-3xl font-medium tracking-tight mb-6"
+              style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
+            >
+              How can I help, {userDisplayName}?
+            </h1>
+
+            {/* Minimal Starter Suggestion Pills */}
+            <div className="flex flex-wrap items-center justify-center gap-2 max-w-[480px]">
+              {[
+                { label: 'Explain a complex concept', prompt: 'Explain ' },
+                { label: 'Write or review code', prompt: 'Write a program to ' },
+                { label: 'Solve a math problem', prompt: 'Can you solve this math problem step-by-step with LaTeX: ' },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setComposerDraft(item.prompt);
+                    const textarea = document.querySelector<HTMLTextAreaElement>('.composer-textarea');
+                    if (textarea) {
+                      textarea.focus();
+                    }
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-medium border transition-all cursor-pointer hover:bg-[var(--surface-2)] active:scale-95 shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-muted)',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </motion.div>
       ) : (
         <div
