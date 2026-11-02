@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Check,
-  Copy,
   LogOut,
   RotateCcw,
   User,
@@ -17,7 +16,6 @@ import {
   setSavedSpeed,
   setSavedVoice,
 } from '../lib/tts';
-import { copyTextToClipboard } from '../lib/markdown';
 import { useAppState } from '../state/store';
 import { StatusPill } from '../components/StatusPill';
 
@@ -36,7 +34,6 @@ export const SettingsPage: React.FC = () => {
   const [nameSaved, setNameSaved] = useState(false);
   const [voice, setVoice] = useState<PocketVoiceId>(() => getSavedVoice());
   const [speed, setSpeed] = useState<number>(() => getSavedSpeed());
-  const [copiedId, setCopiedId] = useState(false);
 
   useEffect(() => {
     setNameInput(userDisplayName);
@@ -77,15 +74,6 @@ export const SettingsPage: React.FC = () => {
   const handleResetSpeed = () => {
     setSpeed(1.0);
     setSavedSpeed(1.0);
-  };
-
-  const handleCopyUserId = async () => {
-    if (!session?.user.id) return;
-    const ok = await copyTextToClipboard(session.user.id);
-    if (ok) {
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 1600);
-    }
   };
 
   const currentTab = settingsSection === 'voices' ? 'voices' : 'account';
@@ -275,45 +263,6 @@ export const SettingsPage: React.FC = () => {
                         {session?.user.email || 'you@example.com'}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Subdivision: User ID */}
-                  <div
-                    className="p-5 flex items-center justify-between gap-3"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <div>
-                      <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        User ID
-                      </div>
-                      <div className="text-xs font-mono mt-0.5 truncate max-w-[220px] sm:max-w-[280px]" style={{ color: 'var(--text-muted)' }}>
-                        {session?.user.id || 'UUID'}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleCopyUserId}
-                      className="px-2.5 py-1 text-xs border inline-flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
-                      style={{
-                        backgroundColor: 'var(--bg)',
-                        borderColor: 'var(--border)',
-                        color: copiedId ? 'var(--success)' : 'var(--text)',
-                        borderRadius: 'var(--radius-sm)',
-                      }}
-                    >
-                      {copiedId ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
                   </div>
 
                   {/* Subdivision: Sign out */}
