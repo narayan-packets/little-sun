@@ -5,9 +5,7 @@ import {
   Check,
   Copy,
   LogOut,
-  Play,
   RotateCcw,
-  Square,
   User,
   Volume2,
 } from 'lucide-react';
@@ -18,7 +16,6 @@ import {
   type PocketVoiceId,
   setSavedSpeed,
   setSavedVoice,
-  ttsController,
 } from '../lib/tts';
 import { copyTextToClipboard } from '../lib/markdown';
 import { useAppState } from '../state/store';
@@ -32,7 +29,6 @@ export const SettingsPage: React.FC = () => {
     settingsSection,
     openSettingsSection,
     setIsSettingsOpen,
-    laptopStatus,
     signOut,
   } = useAppState();
 
@@ -41,7 +37,6 @@ export const SettingsPage: React.FC = () => {
   const [voice, setVoice] = useState<PocketVoiceId>(() => getSavedVoice());
   const [speed, setSpeed] = useState<number>(() => getSavedSpeed());
   const [copiedId, setCopiedId] = useState(false);
-  const [previewPlaying, setPreviewPlaying] = useState(false);
 
   useEffect(() => {
     setNameInput(userDisplayName);
@@ -90,38 +85,6 @@ export const SettingsPage: React.FC = () => {
     if (ok) {
       setCopiedId(true);
       setTimeout(() => setCopiedId(false), 1600);
-    }
-  };
-
-  const handleToggleVoicePreview = () => {
-    if (previewPlaying) {
-      ttsController.stop();
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-      setPreviewPlaying(false);
-      return;
-    }
-
-    setPreviewPlaying(true);
-    const sampleText = `Hello ${userDisplayName || 'there'}! I am Little Sun, speaking with the ${voice} voice.`;
-
-    if (session?.accessToken && laptopStatus !== 'offline') {
-      ttsController.toggleMessage({
-        messageId: `preview-${Date.now()}`,
-        markdown: sampleText,
-        accessToken: session.accessToken,
-      });
-      setTimeout(() => setPreviewPlaying(false), 3200);
-    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(sampleText);
-      utterance.rate = speed;
-      utterance.onend = () => setPreviewPlaying(false);
-      utterance.onerror = () => setPreviewPlaying(false);
-      window.speechSynthesis.speak(utterance);
-    } else {
-      setTimeout(() => setPreviewPlaying(false), 2000);
     }
   };
 
@@ -485,45 +448,6 @@ export const SettingsPage: React.FC = () => {
                       <span>1.0x</span>
                       <span>1.5x</span>
                     </div>
-                  </div>
-
-                  {/* Subdivision 3: Voice Preview */}
-                  <div
-                    className="p-5 flex items-center justify-between gap-3"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <div>
-                      <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        Voice Preview
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        Test audio sample with current voice & speed.
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleToggleVoicePreview}
-                      className="px-3.5 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium border transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-98"
-                      style={{
-                        backgroundColor: previewPlaying ? 'var(--surface-2)' : 'var(--bg)',
-                        borderColor: previewPlaying ? 'var(--accent)' : 'var(--border)',
-                        color: previewPlaying ? 'var(--accent)' : 'var(--text)',
-                        borderRadius: 'var(--radius-sm)',
-                      }}
-                    >
-                      {previewPlaying ? (
-                        <>
-                          <Square className="w-3.5 h-3.5 fill-current" />
-                          <span>Stop</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                          <span>Preview</span>
-                        </>
-                      )}
-                    </button>
                   </div>
                 </div>
               </motion.div>
