@@ -1,9 +1,9 @@
-# Little Sun ☀️ (v1.4)
+# Little Sun ☀️ (v1.5)
 
 > **A warm, private, editorial intelligence interface connecting to your personal local LLM and neural voice engine.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version: 1.4.0](https://img.shields.io/badge/Version-1.4.0-orange.svg)]()
+[![Version: 1.5.0](https://img.shields.io/badge/Version-1.5.0-orange.svg)]()
 [![React 19](https://img.shields.io/badge/React-19.0-blue.svg)](https://react.dev/)
 [![Tailwind CSS 4](https://img.shields.io/badge/Tailwind-4.x-38bdf8.svg)](https://tailwindcss.com/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vitejs.dev/)
@@ -44,7 +44,7 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
 
 ---
 
-## Highlights in V1.4
+## Highlights in V1.5
 
 - ✍️ **Editorial Claude-Inspired Hero**:
   - Time-aware greeting (`Morning`, `Afternoon`, `Evening`) in classic serif typography.
@@ -66,8 +66,11 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
   - Instant new chat (`Ctrl + K` or `Ctrl + Shift + O`).
   - Desktop auto-focus on new chat with mobile on-screen keyboard protection.
 
-- 📱 **Progressive Web App (PWA)**:
-  - Installable on desktop and mobile with clean icons and iOS viewport zoom mitigation.
+- 📱 **Mobile Zero-Cache & Ergonomics (V1.5)**:
+  - Instant zero-cache headers (`Cache-Control: no-cache, no-store, must-revalidate`) preventing stale mobile browser snapshots.
+  - Auto-purge script clearing old browser CacheStorage and unregistering stale workers.
+  - Scroll-resilient hero container with iOS WebKit touch-focus protection.
+  - Full Progressive Web App (PWA) manifest support.
 
 ---
 
