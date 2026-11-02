@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChatView } from '../components/ChatView';
 import { Sidebar } from '../components/Sidebar';
+import { KeyboardShortcutsModal } from '../components/KeyboardShortcutsModal';
 import { useAppState } from '../state/store';
 import { SettingsPage } from './Settings';
 
@@ -9,7 +10,7 @@ export const ChatPage: React.FC = () => {
 
   return (
     <div
-      className="w-full h-[100dvh] flex overflow-hidden"
+      className="w-full h-[100dvh] flex overflow-hidden relative"
       style={{ backgroundColor: 'var(--bg)', color: 'var(--text)' }}
     >
       {isSettingsOpen ? (
@@ -20,6 +21,9 @@ export const ChatPage: React.FC = () => {
           <ChatView />
         </>
       )}
+
+      {/* Global Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal />
     </div>
   );
 };

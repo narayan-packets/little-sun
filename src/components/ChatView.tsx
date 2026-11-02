@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowDown, Menu, PanelLeft, Settings } from 'lucide-react';
+import { ArrowDown, Keyboard, Menu, PanelLeft, Settings } from 'lucide-react';
 import { useAppState } from '../state/store';
 import { Composer } from './Composer';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -24,6 +24,7 @@ export const ChatView: React.FC = () => {
     setIsSidebarOpen,
     toggleDesktopSidebar,
     setIsSettingsOpen,
+    setIsShortcutsOpen,
     signOut,
     setComposerDraft,
   } = useAppState();
@@ -163,6 +164,19 @@ export const ChatView: React.FC = () => {
 
         <div className="flex items-center gap-1.5 shrink-0">
           <StatusPill />
+          <button
+            type="button"
+            onClick={() => setIsShortcutsOpen(true)}
+            className="hidden sm:inline-flex min-h-[40px] min-w-[40px] items-center justify-center transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
+            style={{
+              color: 'var(--text-muted)',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            aria-label="Keyboard shortcuts (?)"
+            title="Keyboard shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}

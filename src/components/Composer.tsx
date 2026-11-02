@@ -12,6 +12,7 @@ function formatCompactTokens(n: number): string {
 
 export const Composer: React.FC = () => {
   const {
+    activeChatId,
     composerDraft,
     setComposerDraft,
     contextUsage,
@@ -42,6 +43,18 @@ export const Composer: React.FC = () => {
   const isInputBlocked = isOffline || isChatLimitReached || isAccessRestricted;
   const isSendDisabled =
     isInputBlocked || isDraftOverTurnLimit || !composerDraft.trim();
+
+  // Desktop auto-focus on composer when on a new/fresh chat
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile =
+      window.matchMedia('(max-width: 767px)').matches ||
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0;
+    if (!isMobile && textareaRef.current && !activeChatId && !isInputBlocked) {
+      textareaRef.current.focus();
+    }
+  }, [activeChatId, isInputBlocked]);
 
   // Auto-grow textarea smoothly up to ~6 lines (approx 160px)
   useEffect(() => {

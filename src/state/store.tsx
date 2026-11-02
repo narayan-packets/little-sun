@@ -177,7 +177,9 @@ interface AppStateContextValue {
   isSidebarOpen: boolean;
   isDesktopSidebarCollapsed: boolean;
   isSettingsOpen: boolean;
+  isShortcutsOpen: boolean;
   settingsSection: SettingsRouteSection;
+  setIsShortcutsOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setComposerDraft: (text: string) => void;
   setSelectedModelId: (modelId: string) => void;
   setIsSidebarOpen: (open: boolean) => void;
@@ -256,6 +258,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     return false;
   });
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const isStreamingRef = useRef(false);
@@ -679,10 +682,27 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setFailedSend(null);
     setIsSidebarOpen(false);
     setIsSettingsOpenState(false);
+    setIsShortcutsOpen(false);
     if (session) {
       void notifyGatewayChatSwitch(session.accessToken, null, 'sleep');
     }
     updateBrowserUrl('/newchat');
+
+    // Desktop auto-focus on composer textarea
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        const isMobile =
+          window.matchMedia('(max-width: 767px)').matches ||
+          'ontouchstart' in window ||
+          navigator.maxTouchPoints > 0;
+        if (!isMobile) {
+          const textarea = document.querySelector<HTMLTextAreaElement>('.composer-textarea');
+          if (textarea) {
+            textarea.focus();
+          }
+        }
+      }, 50);
+    }
   }, [session, stopGenerating]);
 
   const continueInNewChat = useCallback(() => {
@@ -699,21 +719,51 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [messages, startNewChat]);
 
-  // Desktop keyboard shortcut: Ctrl/Cmd + Shift + O (or Ctrl/Cmd + K) to spawn a new chat instance
+  // Desktop keyboard shortcuts:
+  // - Ctrl/Cmd + Shift + O or Ctrl/Cmd + K: new chat instance
+  // - ? or Ctrl/Cmd + /: toggle keyboard shortcuts helper
+  // - Esc: dismiss shortcuts modal
   useEffect(() => {
     if (typeof window === 'undefined' || !session) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
-      if (!isMod) return;
       const key = e.key.toLowerCase();
-      if ((e.shiftKey && key === 'o') || (!e.shiftKey && key === 'k')) {
+      const targetTag = (e.target as HTMLElement)?.tagName;
+      const isTyping =
+        targetTag === 'INPUT' ||
+        targetTag === 'TEXTAREA' ||
+        (e.target as HTMLElement)?.isContentEditable;
+
+      // Toggle shortcuts modal: Ctrl/Cmd + / or ?
+      if (isMod && (e.key === '/' || e.key === '?')) {
+        e.preventDefault();
+        setIsShortcutsOpen((prev) => !prev);
+        return;
+      }
+
+      // Standalone ? when not typing inside an input/textarea
+      if (!isMod && e.key === '?' && !isTyping) {
+        e.preventDefault();
+        setIsShortcutsOpen((prev) => !prev);
+        return;
+      }
+
+      // Close shortcuts modal on Escape
+      if (e.key === 'Escape' && isShortcutsOpen) {
+        e.preventDefault();
+        setIsShortcutsOpen(false);
+        return;
+      }
+
+      // New Chat: Ctrl/Cmd + Shift + O or Ctrl/Cmd + K
+      if (isMod && ((e.shiftKey && key === 'o') || (!e.shiftKey && key === 'k'))) {
         e.preventDefault();
         startNewChat();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [session, startNewChat]);
+  }, [session, startNewChat, isShortcutsOpen]);
 
   // Browser Back / Forward navigation (popstate)
   useEffect(() => {
@@ -1110,7 +1160,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isSidebarOpen,
       isDesktopSidebarCollapsed,
       isSettingsOpen,
+      isShortcutsOpen,
       settingsSection,
+      setIsShortcutsOpen,
       setComposerDraft,
       setSelectedModelId,
       setIsSidebarOpen,
@@ -1152,7 +1204,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isSidebarOpen,
       isDesktopSidebarCollapsed,
       isSettingsOpen,
+      isShortcutsOpen,
       settingsSection,
+      setIsShortcutsOpen,
       toggleDesktopSidebar,
       setIsSettingsOpen,
       openSettingsSection,
