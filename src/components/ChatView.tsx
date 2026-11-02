@@ -311,6 +311,29 @@ export const ChatView: React.FC = () => {
                   );
                 })}
               </div>
+
+              {/* Whisper-Quiet Desktop Keyboard Hint */}
+              <div
+                className="hidden sm:flex items-center justify-center gap-2 mt-5 text-[11px] select-none opacity-50 transition-opacity hover:opacity-85"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <span>Press</span>
+                <kbd
+                  className="px-1.5 py-0.5 font-mono text-[10px] rounded border"
+                  style={{ backgroundColor: 'var(--surface-2)', borderColor: 'var(--border)' }}
+                >
+                  ?
+                </kbd>
+                <span>for shortcuts</span>
+                <span className="opacity-40">·</span>
+                <kbd
+                  className="px-1.5 py-0.5 font-mono text-[10px] rounded border"
+                  style={{ backgroundColor: 'var(--surface-2)', borderColor: 'var(--border)' }}
+                >
+                  Ctrl+K
+                </kbd>
+                <span>for new chat</span>
+              </div>
             </div>
           </motion.div>
         ) : (
@@ -344,10 +367,20 @@ export const ChatView: React.FC = () => {
                     {streamingContent ? (
                       <div className="w-full max-w-full min-w-0 ls-markdown">
                         <MarkdownRenderer content={streamingContent} isStreaming />
+                        <span className="solar-cursor mt-2" aria-label="Generating" />
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2.5 py-1">
-                        <SunMark size={22} state="waking" animated />
+                      <div
+                        className="inline-flex items-center gap-2 py-1.5 px-3 rounded-full border shadow-2xs select-none"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          borderColor: 'var(--border)',
+                        }}
+                      >
+                        <SunMark size={16} state="waking" animated />
+                        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                          {streamingStage === 'loading_model' ? 'Waking model…' : 'Thinking…'}
+                        </span>
                       </div>
                     )}
                   </div>

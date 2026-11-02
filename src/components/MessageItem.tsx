@@ -140,7 +140,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
             <SunMark size={18} state="waking" animated />
           ) : isThisPlaying ? (
             <>
-              <Square className="w-3 h-3 shrink-0 fill-current" />
+              <span
+                className="audio-waveform inline-flex items-end gap-[2px] h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              >
+                <span className="audio-wave-bar audio-bar-1 w-[2.5px] rounded-full bg-current" />
+                <span className="audio-wave-bar audio-bar-2 w-[2.5px] rounded-full bg-current" />
+                <span className="audio-wave-bar audio-bar-3 w-[2.5px] rounded-full bg-current" />
+              </span>
               <span className="font-medium">Stop</span>
             </>
           ) : (

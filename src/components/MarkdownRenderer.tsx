@@ -521,6 +521,12 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, isStreaming }) =>
         }}
       >
         <div className="flex items-center gap-2 min-w-0">
+          {/* macOS subtle window controls */}
+          <div className="flex items-center gap-1.5 mr-1 shrink-0" aria-hidden="true">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] opacity-80" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] opacity-80" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f] opacity-80" />
+          </div>
           <HeaderIcon className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
           <span
             className="text-xs font-medium truncate"
