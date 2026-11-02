@@ -260,7 +260,7 @@ export const ChatView: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 flex flex-col items-center justify-center px-3.5 sm:px-4 select-none pb-8 sm:pb-16"
+            className="flex-1 flex flex-col items-center justify-center px-3.5 sm:px-4 pb-8 sm:pb-16 overflow-y-auto w-full"
           >
             <div className="w-full max-w-[680px] mx-auto flex flex-col items-center">
               {/* Claude-style Hero Greeting: SunMark + Time-aware Greeting in Editorial Serif */}

@@ -2,6 +2,21 @@
   command = "npm run build"
   publish = "dist"
 
+# Cache control headers: ensure index.html and SPA routes never get cached by mobile/desktop browsers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    Pragma = "no-cache"
+    Expires = "0"
+    X-Content-Type-Options = "nosniff"
+
+# Vite hashed assets can be cached safely and immutably
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # Optional Edge proxy for Little Sun Gateway (Tailscale Funnel)
 # Replace <your-laptop>.<your-tailnet>.ts.net or set VITE_GATEWAY_URL in Netlify Environment Variables
 [[redirects]]

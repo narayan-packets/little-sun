@@ -63,6 +63,11 @@ body {
   outline-offset: 2px;
 }
 
+.composer-textarea {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
 .composer-textarea:focus,
 .composer-textarea:focus-visible {
   outline: none !important;
