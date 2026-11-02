@@ -1,10 +1,11 @@
-# Little Sun ☀️ (v1.3)
+# Little Sun ☀️ (v1.4)
 
-> **A calm, private intelligence workspace connecting an editorial web interface to your personal local LLM and neural voice engine.**
+> **A warm, private, editorial intelligence interface connecting to your personal local LLM and neural voice engine.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-orange.svg)]()
+[![Version: 1.4.0](https://img.shields.io/badge/Version-1.4.0-orange.svg)]()
 [![React 19](https://img.shields.io/badge/React-19.0-blue.svg)](https://react.dev/)
+[![Tailwind CSS 4](https://img.shields.io/badge/Tailwind-4.x-38bdf8.svg)](https://tailwindcss.com/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vitejs.dev/)
 [![Tailscale](https://img.shields.io/badge/Network-Tailscale_Funnel-blue.svg)](https://tailscale.com/)
 
@@ -12,9 +13,9 @@
 
 ## Overview
 
-**Little Sun** pairs an elegant, distraction-free web client with your own laptop's local inference gateway (`little-sun-gateway`). Powered by [`llama.cpp`](https://github.com/ggerganov/llama.cpp) for offline intelligence and [`piper-tts`](https://github.com/rhasspy/piper) for natural neural voice streaming, your conversations, prompts, and model weights remain completely under your control.
+**Little Sun** pairs an elegant, distraction-free web client with your own laptop's local inference gateway (`little-sun-gateway`). Powered by [`llama.cpp`](https://github.com/ggerganov/llama.cpp) for offline GGUF intelligence and [`piper-tts`](https://github.com/rhasspy/piper) for natural neural voice streaming, your conversations, prompts, and model weights remain completely under your sovereign control.
 
-With **Supabase Auth & Realtime**, your chats, history, and voice preferences synchronize instantaneously across all your devices—desktop, laptop, tablet, and mobile.
+With **Supabase Auth & Realtime**, your chats, history, and voice preferences synchronize instantaneously across all your devices—desktop, laptop, tablet, and mobile. Out of the box, it also provides an offline preview mode requiring zero external accounts.
 
 ---
 
@@ -23,7 +24,7 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Web Client (React)                        │
-│   • Editorial typography, dark & light ambient solar themes     │
+│   • Editorial typography, dark & light warm solar themes        │
 │   • KaTeX & Interactive 2D function visualizers (vertex, roots) │
 │   • Real-time token streaming with animated solar state emblem  │
 │   • Full multi-device sync, /account & /voices controls         │
@@ -37,18 +38,45 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
 │       Supabase Postgres       │ │      little-sun-gateway       │
 │   • Row-Level Security (RLS)  │ │   • Node.js gateway (Port 8790)│
 │   • Realtime publication sync │ │   • llama-server (GGUF slot)  │
-│   • Invite-only user auth     │ │   • Piper neural voice engine │
+│   • Private user auth         │ │   • Piper neural voice engine │
 └───────────────────────────────┘ └───────────────────────────────┘
 ```
 
 ---
 
-## Key Features
+## Highlights in V1.4
 
-- **📐 Interactive Math Visualizer (V1.3)**:
+- ✍️ **Editorial Claude-Inspired Hero**:
+  - Time-aware greeting (`Morning`, `Afternoon`, `Evening`) in classic serif typography.
+  - Centered hero composer with starter suggestion pills (`Write`, `Learn`, `Code`, `Solve Math`).
+  - Seamless, jitter-free transition between empty state and active chat conversation.
+
+- ☀️ **The Luminous Solar Cursor & Model Waking State**:
+  - Dedicated visual indicator pill displaying real-time engine states (*"Waking model…"* or *"Thinking…"*).
+  - Trailing breathing solar ember dot (`.solar-cursor`) with GPU-accelerated pulse animation during streaming.
+
+- 🖥️ **Mac-Style Terminal Code Blocks**:
+  - Three-dot macOS window controls with instant one-click copy, syntax highlighting, and mobile line wrapping.
+
+- 🎙️ **Living Audio Waveform**:
+  - Real-time 3-bar animated acoustic soundwave indicator when Pocket TTS is reading aloud.
+
+- ⌨️ **Fluid Keyboard Navigation**:
+  - Global shortcut modal (`?` or `Ctrl + /`).
+  - Instant new chat (`Ctrl + K` or `Ctrl + Shift + O`).
+  - Desktop auto-focus on new chat with mobile on-screen keyboard protection.
+
+- 📱 **Progressive Web App (PWA)**:
+  - Installable on desktop and mobile with clean icons and iOS viewport zoom mitigation.
+
+---
+
+## Core Capabilities
+
+- **📐 Interactive Math Visualizer**:
   - **Dynamic 2D Function Plotting**: Automatic interactive SVG curves for quadratic and linear equations with hover crosshairs and analytical point markers (roots, vertex, y-intercept, axis of symmetry).
   - **Analytical Derivations**: Step-by-step breakdown of quadratic formula, vertex coordinates, and discriminant ($\Delta$).
-  - **KaTeX Mathematical Typesetting**: Beautiful inline and display rendering of algebra, calculus, matrices, and arithmetic.
+  - **KaTeX Mathematical Typesetting**: Crisp inline and display rendering of algebra, calculus, matrices, and arithmetic.
 
 - **🔒 Zero Model & Data Leakage**:
   - Raw GGUF model file names, quantization formats, and local filesystem paths stay strictly on your hardware.
@@ -74,6 +102,7 @@ little-sun/
 ├── src/                          # Frontend React SPA
 │   ├── components/               # UI components (MathVisualizer, ChatView, Composer, etc.)
 │   ├── lib/                      # Core utilities (gateway client, Supabase client, TTS, tokens)
+│   ├── pages/                    # Chat, Login, and Settings views
 │   ├── state/                    # Global state & conversation store
 │   └── styles/                   # Solar theme tokens and Tailwind CSS
 ├── little-sun-gateway/           # Local Laptop Inference Gateway
@@ -120,9 +149,10 @@ VITE_SUPABASE_ANON_KEY="your-supabase-anon-key"
 VITE_GATEWAY_URL="https://<your-laptop>.<your-tailnet>.ts.net"
 ```
 
+*(Note: If you leave `VITE_SUPABASE_URL` unset, Little Sun automatically operates in Local Offline Preview mode with local storage persistence!)*
+
 #### Run Web Development Server
 ```bash
-# Start Vite development server
 npm run dev
 ```
 
@@ -134,11 +164,11 @@ npm start
 
 ---
 
-### 2. Supabase Setup
+### 2. Supabase Setup (Optional for Multi-Device Sync)
 
 1. Create a free project at [supabase.com](https://supabase.com).
 2. Open the **SQL Editor**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql), and click **Run**.
-   - This sets up `chats` and `messages` tables, enables Row-Level Security (RLS), adds timestamp triggers, and enables the `supabase_realtime` publication.
+   - This creates `chats` and `messages` tables, enables Row-Level Security (RLS), adds timestamp triggers, and enables the `supabase_realtime` publication.
 3. In **Authentication → Providers → Email**, you can optionally disable public signups to keep your instance private and invite-only.
 4. Add your personal email under **Authentication → Users**.
 
@@ -210,7 +240,7 @@ Configure your available GGUF models in `little-sun-gateway/models.json`:
 
 Deploy the frontend anywhere with zero backend lock-in:
 
-- **Netlify**: Pre-configured with `netlify.toml`. Push your repo to GitHub and connect it to Netlify. Set your environment variables in Site settings.
+- **Netlify**: Pre-configured with `netlify.toml`. Connect your repository to Netlify and add your environment variables in Site settings.
 - **Vercel**: Pre-configured with `vercel.json` SPA rewrite rules.
 - **Self-Hosted / Docker**: Build static assets with `npm run build` and serve via Node or Nginx.
 
@@ -220,8 +250,10 @@ Deploy the frontend anywhere with zero backend lock-in:
 
 | Shortcut | Action |
 | :--- | :--- |
-| `Ctrl` / `Cmd` + `Shift` + `O` | New chat (sleeps current model slot) |
-| `Ctrl` / `Cmd` + `K` | Toggle sidebar navigation |
+| `Ctrl` / `Cmd` + `K` | New chat (sleeps current model slot) |
+| `Ctrl` / `Cmd` + `Shift` + `O` | New chat alternative |
+| `?` or `Ctrl` + `/` | Open Keyboard Shortcuts cheatsheet |
+| `Esc` | Close modals and dialogs |
 | `Enter` | Send prompt |
 | `Shift` + `Enter` | Insert new line in composer |
 
