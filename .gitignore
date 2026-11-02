@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+package-lock.json.bak
+
+# Production Builds
+dist/
+build/
+dev-dist/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+little-sun-gateway/logs/
+
+# Environment Variables & Target State
+.env*
+!.env.example
+little-sun-gateway/.env*
+!little-sun-gateway/.env.example
+.gateway-target.json
+
+# Local Binaries and Model Weights
+little-sun-gateway/bin/
+little-sun-gateway/models/*.gguf
+little-sun-gateway/models/*.bin
+!little-sun-gateway/models/.gitkeep
+
+# IDE and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,235 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+@import "./styles/tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Custom subtle scrollbars for desktop & mobile */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
+}
+
+/* Accessible focus ring for buttons, suppressed inside composer textarea */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.composer-textarea:focus,
+.composer-textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.composer-card {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.composer-card:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: 0 4px 20px rgba(217, 130, 43, 0.09);
+}
+
+/* Minimal Architectural Solar Animations */
+@keyframes sun-rays-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sun-core-breathe {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+.sun-rays-animated {
+  transform-origin: 16px 16px;
+  animation: sun-rays-rotate 8s linear infinite;
+}
+
+.sun-core-animated {
+  transform-origin: 16px 16px;
+  animation: sun-core-breathe 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sun-rays-animated,
+  .sun-core-animated {
+    animation: none;
+  }
+}
+
+/* KaTeX Display Overrides */
+.ls-katex-display .katex-display {
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+.ls-katex-display .katex {
+  font-size: 1.15em;
+  color: var(--text);
+}
+
+/* Markdown message typography */
+.ls-markdown {
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.65;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.ls-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.ls-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.ls-markdown p {
+  margin: 0 0 12px 0;
+}
+
+.ls-markdown h1,
+.ls-markdown h2,
+.ls-markdown h3,
+.ls-markdown h4 {
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 20px 0 8px 0;
+  text-wrap: balance;
+}
+
+.ls-markdown h1 { font-size: 1.35rem; }
+.ls-markdown h2 { font-size: 1.2rem; }
+.ls-markdown h3 { font-size: 1.075rem; }
+
+.ls-markdown ul,
+.ls-markdown ol {
+  margin: 0 0 12px 0;
+  padding-left: 22px;
+}
+
+.ls-markdown ul { list-style-type: disc; }
+.ls-markdown ol { list-style-type: decimal; }
+
+.ls-markdown li {
+  margin-bottom: 4px;
+}
+
+.ls-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ls-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ls-markdown th,
+.ls-markdown td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ls-markdown tr:last-child td {
+  border-bottom: none;
+}
+
+.ls-markdown th {
+  background-color: var(--surface-2);
+  font-weight: 600;
+}
+
+/* Smooth GPU-accelerated line-by-line response reveal (zero layout jitter) */
+@keyframes ls-line-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 5px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.ls-line-reveal {
+  animation: ls-line-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--line-delay, 0ms);
+  backface-visibility: hidden;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-line-reveal {
+    animation: none;
+  }
+}
+

@@ -1,0 +1,927 @@
+import React, { useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Code2,
+  Copy,
+  FileText,
+  Quote,
+  Table as TableIcon,
+  Terminal,
+  WrapText,
+} from 'lucide-react';
+import { copyTextToClipboard } from '../lib/markdown';
+import { InlineMathSpan, MathVisualCard } from './MathVisualizer';
+
+interface MarkdownRendererProps {
+  content: string;
+  isStreaming?: boolean;
+}
+
+const MATH_LANGS = new Set([
+  'math',
+  'latex',
+  'tex',
+  'katex',
+  'equation',
+  'formula',
+  'plot',
+  'graph',
+  'function',
+  'calc',
+]);
+
+function looksLikeMathBlock(code: string): boolean {
+  const t = code.trim();
+  if (!t || t.length < 2) return false;
+  if (
+    /\\(?:frac|sqrt|sum|int|prod|lim|alpha|beta|gamma|theta|pi|sin|cos|tan|cdot|times|div|pm|leq|geq|neq|approx|infty|begin\{(?!tabular))/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^(?:[fghy]\s*\(\s*x\s*\)|y)\s*=\s*[-+0-9xX^*/().\s\\a-zA-Z]+$/m.test(t) &&
+    !t.includes('const ') &&
+    !t.includes('def ') &&
+    !t.includes('return ') &&
+    !t.includes(';')
+  ) {
+    return true;
+  }
+  // Standalone polynomial / algebraic equation:
+  if (/^[-+0-9xX^*/().\s\\a-zA-Z×÷±_]+\s*=\s*[-+0-9xX^*/().\s\\a-zA-Z×÷±_]+$/m.test(t)) {
+    if (
+      /[xX\^]/.test(t) &&
+      !t.includes('const ') &&
+      !t.includes('let ') &&
+      !t.includes('var ') &&
+      !t.includes(';') &&
+      !t.includes('"') &&
+      !t.includes("'")
+    ) {
+      return true;
+    }
+  }
+  // Arithmetic calculation: e.g. 19 * 99 = 1881, 19 * 99
+  if (/^\s*\d+(?:\.\d+)?\s*[-+*/×÷]\s*\d+(?:\.\d+)?(?:\s*[-+*/×÷=]\s*\d+(?:\.\d+)?)*\s*$/m.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+function isStandaloneMathLine(line: string): boolean {
+  const t = line.trim();
+  if (!t || t.length < 2) return false;
+
+  // Ignore markdown headings, blockquotes, list markers, code keywords, links
+  if (/^(?:#{1,6}\s|>|[-*+]\s|\d+\.\s|const\s|let\s|var\s|function\s|return\s|import\s|export\s|\/\/|\/\*)/.test(t)) {
+    return false;
+  }
+  if (t.includes(';') || t.includes('http:') || t.includes('https:') || t.startsWith('`')) {
+    return false;
+  }
+
+  // LaTeX commands
+  if (
+    /\\(?:frac|sqrt|sum|int|prod|lim|alpha|beta|gamma|theta|pi|cdot|times|div|pm|leq|geq|neq|approx|infty|sin|cos|tan)(?![a-zA-Z])/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+
+  // Braces are only allowed if LaTeX, powers, or subscripts
+  if (t.includes('{') || t.includes('}')) {
+    if (!/\\|\^|_/.test(t)) return false;
+  }
+
+  // Arithmetic equation or expression: e.g. 19 * 99 = 1881, 19 * 99, 125 / 5 = 25
+  if (/^\s*\d+(?:\.\d+)?\s*[-+*/×÷]\s*\d+(?:\.\d+)?(?:\s*[-+*/×÷=]\s*\d+(?:\.\d+)?)*\s*$/.test(t)) {
+    return true;
+  }
+
+  // Function or polynomial equation: e.g. x^2 + 2x + 1 = 0, f(x) = x^2 - 4, y = 2x + 3, 2x^2 + 3x - 5 = 0, x + 1 = 0, x = -1
+  if (t.includes('=')) {
+    const parts = t.split('=');
+    if (parts.length === 2) {
+      const lhs = parts[0].trim();
+      const rhs = parts[1].trim();
+      const hasMathVar =
+        /(?<![a-zA-Z])[a-zA-Z](?![a-zA-Z])/.test(lhs) ||
+        /(?<![a-zA-Z])[a-zA-Z](?![a-zA-Z])/.test(rhs);
+      const isSimpleMathChars =
+        /^[-+0-9a-zA-Z^*/().\s\\×÷±_{}]+$/.test(lhs) &&
+        /^[-+0-9a-zA-Z^*/().\s\\×÷±_{}]+$/.test(rhs);
+      if (hasMathVar && isSimpleMathChars) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Normalizes display math ($$ ... $$, \[ ... \], \begin{...} ... \end{...}) into fenced ```math blocks
+ * and inline math ($ ... $, \( ... \)) into `math-inline:...` code spans
+ * while leaving regular fenced code blocks untouched.
+ */
+function preprocessMathMarkdown(raw: string): string {
+  if (!raw) return raw;
+
+  let text = raw;
+
+  // 1. Convert LaTeX display environments into fenced math blocks
+  text = text.replace(
+    /\\begin\{(?:equation|align|aligned|gather|matrix|pmatrix|bmatrix)\*?\}[\s\S]*?\\end\{(?:equation|align|aligned|gather|matrix|pmatrix|bmatrix)\*?\}/g,
+    (match) => `\n\n\`\`\`math\n${match.trim()}\n\`\`\`\n\n`
+  );
+
+  // 2. Convert \[ ... \] display math into fenced math blocks
+  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => {
+    return `\n\n\`\`\`math\n${inner.trim()}\n\`\`\`\n\n`;
+  });
+
+  // 3. Convert $$ ... $$ display math into fenced math blocks
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => {
+    return `\n\n\`\`\`math\n${inner.trim()}\n\`\`\`\n\n`;
+  });
+
+  // 4. Convert \( ... \) inline math into `math-inline:...`
+  text = text.replace(/\\\(([^\n]+?)\\\)/g, (_, inner) => {
+    return `\`math-inline:${inner.trim()}\``;
+  });
+
+  // 5. Convert $ ... $ inline math (avoiding currency like $10 or $50)
+  text = text.replace(
+    /(?<![\\$\d])\$(?!\s)((?:\\.|[^$\n])+?)(?<!\s)\$(?!\d)/g,
+    (match, inner) => {
+      const trimmed = inner.trim();
+      if (/^\d+(?:[.,]\d+)?\s/.test(trimmed)) return match;
+      return `\`math-inline:${trimmed}\``;
+    }
+  );
+
+  // 6. Split by all fenced code blocks (both existing ones and the newly converted math blocks)
+  const parts = text.split(/(```[\s\S]*?```)/g);
+
+  return parts
+    .map((segment, index) => {
+      // Odd indices are fenced code blocks — leave completely untouched!
+      if (index % 2 === 1) return segment;
+
+      const lines = segment.split('\n');
+      const processedLines = lines.map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return line;
+
+        if (isStandaloneMathLine(trimmed)) {
+          return `\n\`\`\`math\n${trimmed}\n\`\`\`\n`;
+        }
+
+        let inlineProcessed = line;
+        inlineProcessed = inlineProcessed.replace(
+          /(?<![`\\a-zA-Z0-9])([a-zA-Z]\s*[-+]\s*\d+\s*=\s*[-+]?\d+)(?![`a-zA-Z0-9])/g,
+          '`math-inline:$1`'
+        );
+        inlineProcessed = inlineProcessed.replace(
+          /(?<![`\\a-zA-Z0-9])([a-zA-Z]\s*=\s*[-+]?\d+(?:\.\d+)?)(?![`a-zA-Z0-9])/g,
+          '`math-inline:$1`'
+        );
+        return inlineProcessed;
+      });
+
+      return processedLines.join('\n');
+    })
+    .join('');
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  js: 'JavaScript',
+  javascript: 'JavaScript',
+  jsx: 'JSX',
+  ts: 'TypeScript',
+  typescript: 'TypeScript',
+  tsx: 'TSX',
+  py: 'Python',
+  python: 'Python',
+  sh: 'Shell',
+  bash: 'Bash',
+  zsh: 'Zsh',
+  shell: 'Shell',
+  cmd: 'Command Prompt',
+  bat: 'Batch',
+  batch: 'Batch',
+  ps1: 'PowerShell',
+  powershell: 'PowerShell',
+  json: 'JSON',
+  yaml: 'YAML',
+  yml: 'YAML',
+  toml: 'TOML',
+  html: 'HTML',
+  xml: 'XML',
+  svg: 'SVG',
+  css: 'CSS',
+  scss: 'SCSS',
+  sql: 'SQL',
+  md: 'Markdown',
+  markdown: 'Markdown',
+  txt: 'Text',
+  text: 'Text',
+  plaintext: 'Plain Text',
+  c: 'C',
+  cpp: 'C++',
+  cs: 'C#',
+  csharp: 'C#',
+  java: 'Java',
+  go: 'Go',
+  golang: 'Go',
+  rs: 'Rust',
+  rust: 'Rust',
+  php: 'PHP',
+  rb: 'Ruby',
+  ruby: 'Ruby',
+  swift: 'Swift',
+  kt: 'Kotlin',
+  kotlin: 'Kotlin',
+  dockerfile: 'Dockerfile',
+  env: 'Environment',
+  ini: 'Config',
+};
+
+const SHELL_LANGS = new Set([
+  'sh',
+  'bash',
+  'zsh',
+  'shell',
+  'cmd',
+  'bat',
+  'batch',
+  'ps1',
+  'powershell',
+  'console',
+  'terminal',
+]);
+
+const TEXT_LANGS = new Set(['txt', 'text', 'plaintext', 'md', 'markdown', 'quote', 'prompt']);
+
+const CODE_KEYWORDS = new Set([
+  'const',
+  'let',
+  'var',
+  'function',
+  'return',
+  'if',
+  'else',
+  'for',
+  'while',
+  'do',
+  'switch',
+  'case',
+  'break',
+  'continue',
+  'default',
+  'import',
+  'from',
+  'export',
+  'async',
+  'await',
+  'try',
+  'catch',
+  'finally',
+  'throw',
+  'new',
+  'class',
+  'extends',
+  'implements',
+  'interface',
+  'type',
+  'enum',
+  'public',
+  'private',
+  'protected',
+  'static',
+  'readonly',
+  'def',
+  'elif',
+  'except',
+  'lambda',
+  'with',
+  'as',
+  'pass',
+  'yield',
+  'in',
+  'is',
+  'not',
+  'and',
+  'or',
+  'True',
+  'False',
+  'None',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'void',
+  'int',
+  'float',
+  'double',
+  'char',
+  'bool',
+  'boolean',
+  'string',
+  'struct',
+  'fn',
+  'mut',
+  'pub',
+  'use',
+  'mod',
+  'match',
+  ' impl',
+  'where',
+  'package',
+  'func',
+  'defer',
+  'go',
+  'select',
+  'SELECT',
+  'FROM',
+  'WHERE',
+  'INSERT',
+  'INTO',
+  'VALUES',
+  'UPDATE',
+  'SET',
+  'DELETE',
+  'CREATE',
+  'TABLE',
+  'JOIN',
+  'LEFT',
+  'INNER',
+  'ORDER',
+  'BY',
+  'GROUP',
+  'LIMIT',
+]);
+
+function highlightCodeLine(line: string, isPlainText: boolean): React.ReactNode {
+  if (isPlainText || !line) {
+    return line || '\u00A0';
+  }
+
+  const trimmed = line.trimStart();
+  if (
+    trimmed.startsWith('//') ||
+    trimmed.startsWith('#') ||
+    trimmed.startsWith('-- ') ||
+    trimmed.startsWith('REM ') ||
+    trimmed.startsWith('::')
+  ) {
+    return <span style={{ color: 'var(--syntax-comment)', fontStyle: 'italic' }}>{line}</span>;
+  }
+
+  // Tokenize strings, comments, numbers, function calls, and identifiers
+  const tokenRegex =
+    /(\/\/.*$|#.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b\d+(?:\.\d+)?\b|\b[A-Za-z_]\w*(?=\s*\()|\b[A-Za-z_]\w*\b)/g;
+
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(line.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+
+    if (token.startsWith('//') || token.startsWith('#')) {
+      nodes.push(
+        <span key={match.index} style={{ color: 'var(--syntax-comment)', fontStyle: 'italic' }}>
+          {token}
+        </span>
+      );
+    } else if (token.startsWith('"') || token.startsWith("'") || token.startsWith('`')) {
+      nodes.push(
+        <span key={match.index} style={{ color: 'var(--syntax-string)' }}>
+          {token}
+        </span>
+      );
+    } else if (/^\d/.test(token)) {
+      nodes.push(
+        <span key={match.index} style={{ color: 'var(--syntax-number)' }}>
+          {token}
+        </span>
+      );
+    } else if (CODE_KEYWORDS.has(token)) {
+      nodes.push(
+        <span key={match.index} style={{ color: 'var(--syntax-keyword)', fontWeight: 500 }}>
+          {token}
+        </span>
+      );
+    } else if (line.slice(match.index + token.length).trimStart().startsWith('(')) {
+      nodes.push(
+        <span key={match.index} style={{ color: 'var(--syntax-fn)' }}>
+          {token}
+        </span>
+      );
+    } else {
+      nodes.push(token);
+    }
+
+    lastIndex = tokenRegex.lastIndex;
+  }
+
+  if (lastIndex < line.length) {
+    nodes.push(line.slice(lastIndex));
+  }
+
+  return nodes.length > 0 ? nodes : line;
+}
+
+function extractNodeText(node: React.ReactNode): string {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractNodeText).join('');
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return extractNodeText(node.props.children);
+  }
+  return '';
+}
+
+interface CodeBlockProps {
+  language: string;
+  code: string;
+  isStreaming?: boolean;
+}
+
+const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, isStreaming }) => {
+  const normalizedLang = (language || '').toLowerCase().trim();
+  const isTextBlock =
+    TEXT_LANGS.has(normalizedLang) ||
+    (!normalizedLang && !code.includes('{') && !code.includes(';') && !code.includes('def ') && !code.includes('const ') && !code.includes('import '));
+
+  const isShellBlock = SHELL_LANGS.has(normalizedLang);
+
+  const [copied, setCopied] = useState(false);
+  const [wrapLines, setWrapLines] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      return false;
+    }
+    return isTextBlock;
+  });
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const lines = useMemo(() => code.split('\n'), [code]);
+  const lineCount = lines.length;
+  const showLineNumbers = !isTextBlock && !isShellBlock && lineCount > 1;
+  const canCollapse = !isStreaming && lineCount > 32;
+  const displayedLines = canCollapse && isCollapsed ? lines.slice(0, 18) : lines;
+
+  const displayLabel = useMemo(() => {
+    if (normalizedLang && LANGUAGE_LABELS[normalizedLang]) {
+      return LANGUAGE_LABELS[normalizedLang];
+    }
+    if (normalizedLang) {
+      return normalizedLang.toUpperCase();
+    }
+    return isTextBlock ? 'Snippet' : 'Code';
+  }, [normalizedLang, isTextBlock]);
+
+  const HeaderIcon = isShellBlock ? Terminal : isTextBlock ? FileText : Code2;
+
+  const handleCopy = async () => {
+    const ok = await copyTextToClipboard(code);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    }
+  };
+
+  return (
+    <div
+      className="my-3.5 first:mt-0 last:mb-0 w-full max-w-full min-w-0 border overflow-hidden"
+      style={{
+        borderColor: 'var(--border)',
+        borderRadius: '12px',
+        backgroundColor: 'var(--code-bg)',
+      }}
+    >
+      {/* Top Toolbar */}
+      <div
+        className="px-3 py-1.5 flex items-center justify-between gap-2 border-b select-none"
+        style={{
+          backgroundColor: 'var(--code-header)',
+          borderColor: 'var(--border)',
+          color: 'var(--text-muted)',
+        }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <HeaderIcon className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+          <span
+            className="text-xs font-medium truncate"
+            style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}
+          >
+            {displayLabel}
+          </span>
+          {lineCount > 1 && (
+            <span className="text-[11px] opacity-75 shrink-0">
+              · {lineCount} {lineCount === 1 ? 'line' : 'lines'}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Wrap Toggle (mobile viewports only) */}
+          <button
+            type="button"
+            onClick={() => setWrapLines((v) => !v)}
+            className="md:hidden min-h-[30px] px-2 py-1 inline-flex items-center gap-1 text-xs transition-colors cursor-pointer active:scale-95"
+            style={{
+              color: wrapLines ? 'var(--accent)' : 'var(--text-muted)',
+              backgroundColor: wrapLines ? 'var(--surface)' : 'transparent',
+              borderRadius: '6px',
+            }}
+            title={wrapLines ? 'Disable line wrapping' : 'Wrap long lines'}
+            aria-label={wrapLines ? 'Disable line wrapping' : 'Wrap long lines'}
+          >
+            <WrapText className="w-3.5 h-3.5 shrink-0" />
+            <span>Wrap</span>
+          </button>
+
+          {/* Copy Button */}
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="min-h-[30px] px-2.5 py-1 inline-flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer active:scale-95"
+            style={{
+              color: copied ? 'var(--success)' : 'var(--text)',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+            }}
+            aria-label={copied ? 'Copied to clipboard' : 'Copy code'}
+            title="Copy to clipboard"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--success)' }} />
+                <span>Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 shrink-0" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Code / Text Body */}
+      <div
+        className={`w-full max-w-full py-3 px-3.5 ${
+          wrapLines ? 'overflow-x-hidden' : 'overflow-x-auto'
+        }`}
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehaviorX: 'contain',
+        }}
+      >
+        <pre
+          className={`m-0 text-[13.5px] sm:text-sm leading-[1.6] ${
+            wrapLines ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'
+          }`}
+          style={{
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text)',
+            tabSize: 2,
+          }}
+        >
+          <code>
+            {displayedLines.map((line, idx) => (
+              <div key={idx} className="table-row">
+                {showLineNumbers && (
+                  <span
+                    className="table-cell pr-3.5 text-right select-none opacity-45 text-[12px]"
+                    style={{ color: 'var(--text-muted)', minWidth: '1.75rem' }}
+                    aria-hidden="true"
+                  >
+                    {idx + 1}
+                  </span>
+                )}
+                <span className="table-cell">
+                  {highlightCodeLine(line, isTextBlock)}
+                  {idx < displayedLines.length - 1 ? '\n' : ''}
+                </span>
+              </div>
+            ))}
+          </code>
+        </pre>
+      </div>
+
+      {/* Expand / Collapse Footer for long code blocks */}
+      {canCollapse && (
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((v) => !v)}
+          className="w-full py-1.5 px-3 border-t flex items-center justify-center gap-1.5 text-xs font-medium transition-colors cursor-pointer"
+          style={{
+            backgroundColor: 'var(--code-header)',
+            borderColor: 'var(--border)',
+            color: 'var(--text-muted)',
+          }}
+        >
+          {isCollapsed ? (
+            <>
+              <ChevronDown className="w-3.5 h-3.5" />
+              <span>Show all {lineCount} lines</span>
+            </>
+          ) : (
+            <>
+              <ChevronUp className="w-3.5 h-3.5" />
+              <span>Collapse code block</span>
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+};
+
+const InlineCodePill: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const [copied, setCopied] = useState(false);
+  const text = extractNodeText(children).trim();
+
+  const handleCopy = async () => {
+    if (!text) return;
+    const ok = await copyTextToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    }
+  };
+
+  return (
+    <code
+      onClick={handleCopy}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCopy();
+        }
+      }}
+      title="Tap to copy"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.86em] transition-colors cursor-pointer break-all sm:break-normal active:scale-95"
+      style={{
+        fontFamily: 'var(--font-mono)',
+        backgroundColor: 'var(--surface-2)',
+        border: `1px solid ${copied ? 'var(--success)' : 'var(--border)'}`,
+        color: copied ? 'var(--success)' : 'var(--text)',
+        borderRadius: '6px',
+      }}
+    >
+      <span>{children}</span>
+      {copied && <Check className="w-3 h-3 shrink-0 inline" style={{ color: 'var(--success)' }} />}
+    </code>
+  );
+};
+
+const BlockquoteWithCopy: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const [copied, setCopied] = useState(false);
+  const rawText = useMemo(() => extractNodeText(children).trim(), [children]);
+
+  const handleCopy = async () => {
+    if (!rawText) return;
+    const ok = await copyTextToClipboard(rawText);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }
+  };
+
+  return (
+    <blockquote
+      className="my-3.5 first:mt-0 last:mb-0 p-3.5 border-l-4 relative group/quote"
+      style={{
+        backgroundColor: 'var(--surface-2)',
+        borderColor: 'var(--accent)',
+        borderRadius: '0 10px 10px 0',
+        color: 'var(--text)',
+      }}
+    >
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <Quote className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-60" style={{ color: 'var(--accent)' }} />
+        {rawText.length > 0 && (
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="min-h-[26px] px-2 py-0.5 inline-flex items-center gap-1 text-[11px] font-medium transition-opacity cursor-pointer shrink-0 active:scale-95"
+            style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              color: copied ? 'var(--success)' : 'var(--text-muted)',
+              borderRadius: '6px',
+            }}
+            title="Copy quoted text"
+            aria-label="Copy quoted text"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3" style={{ color: 'var(--success)' }} />
+                <span>Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+      <div className="text-[15px] leading-relaxed [&>p:last-child]:mb-0">{children}</div>
+    </blockquote>
+  );
+};
+
+const TableWithCopy: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyTable = async () => {
+    const el = tableRef.current;
+    if (!el) return;
+    const rows = Array.from(el.querySelectorAll('tr'));
+    const tsv = rows
+      .map((row) =>
+        Array.from(row.querySelectorAll('th, td'))
+          .map((cell) => (cell.textContent || '').trim())
+          .join('\t')
+      )
+      .join('\n');
+    const ok = await copyTextToClipboard(tsv);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }
+  };
+
+  return (
+    <div
+      className="my-3.5 first:mt-0 last:mb-0 w-full max-w-full min-w-0 border overflow-hidden"
+      style={{
+        borderColor: 'var(--border)',
+        borderRadius: '12px',
+        backgroundColor: 'var(--surface)',
+      }}
+    >
+      <div
+        className="px-3 py-1.5 flex items-center justify-between border-b text-xs select-none"
+        style={{
+          backgroundColor: 'var(--code-header)',
+          borderColor: 'var(--border)',
+          color: 'var(--text-muted)',
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <TableIcon className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          <span className="font-medium" style={{ color: 'var(--text)' }}>
+            Table
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopyTable}
+          className="min-h-[28px] px-2 py-0.5 inline-flex items-center gap-1 text-xs font-medium transition-colors cursor-pointer active:scale-95"
+          style={{
+            color: copied ? 'var(--success)' : 'var(--text)',
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+          }}
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} />
+              <span>Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div
+        className="w-full max-w-full overflow-x-auto"
+        style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain' }}
+      >
+        <table ref={tableRef} className="m-0 w-full border-collapse">
+          {children}
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isStreaming }) => {
+  const normalizedContent = useMemo(() => preprocessMathMarkdown(content), [content]);
+
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p({ children }) {
+          return <p>{children}</p>;
+        },
+        li({ children }) {
+          return <li>{children}</li>;
+        },
+        h1({ children }) {
+          return <h1>{children}</h1>;
+        },
+        h2({ children }) {
+          return <h2>{children}</h2>;
+        },
+        h3({ children }) {
+          return <h3>{children}</h3>;
+        },
+        h4({ children }) {
+          return <h4>{children}</h4>;
+        },
+        pre({ children }) {
+          // Extract the inner <code> element from <pre> so even 1-line unlabeled fenced blocks render as CodeBlock
+          const childArray = React.Children.toArray(children);
+          const firstChild = childArray[0];
+
+          if (
+            React.isValidElement<{ className?: string; children?: React.ReactNode }>(firstChild)
+          ) {
+            const className = firstChild.props.className || '';
+            const langMatch = /language-([\w+-]+)/.exec(className);
+            const language = (langMatch ? langMatch[1] : '').toLowerCase();
+            const rawCode = extractNodeText(firstChild.props.children).replace(/\n$/, '');
+
+            if (MATH_LANGS.has(language) || (!language && looksLikeMathBlock(rawCode))) {
+              return <MathVisualCard code={rawCode} isStreaming={isStreaming} />;
+            }
+
+            return (
+              <CodeBlock
+                language={language}
+                code={rawCode}
+                isStreaming={isStreaming}
+              />
+            );
+          }
+
+          const fallbackCode = extractNodeText(children).replace(/\n$/, '');
+          if (looksLikeMathBlock(fallbackCode)) {
+            return <MathVisualCard code={fallbackCode} isStreaming={isStreaming} />;
+          }
+          return <CodeBlock language="" code={fallbackCode} isStreaming={isStreaming} />;
+        },
+        code({ className, children }) {
+          // If ReactMarkdown invokes code outside of <pre>, it's an inline code span
+          const textContent = extractNodeText(children);
+          if (textContent.startsWith('math-inline:')) {
+            return <InlineMathSpan latex={textContent.slice('math-inline:'.length)} />;
+          }
+          if (className || textContent.includes('\n')) {
+            const langMatch = /language-([\w+-]+)/.exec(className || '');
+            const language = (langMatch ? langMatch[1] : '').toLowerCase();
+            const cleanCode = textContent.replace(/\n$/, '');
+            if (MATH_LANGS.has(language) || (!language && looksLikeMathBlock(cleanCode))) {
+              return <MathVisualCard code={cleanCode} isStreaming={isStreaming} />;
+            }
+            return (
+              <CodeBlock
+                language={language}
+                code={cleanCode}
+                isStreaming={isStreaming}
+              />
+            );
+          }
+          return <InlineCodePill>{children}</InlineCodePill>;
+        },
+        blockquote({ children }) {
+          return <BlockquoteWithCopy>{children}</BlockquoteWithCopy>;
+        },
+        table({ children }) {
+          return <TableWithCopy>{children}</TableWithCopy>;
+        },
+      }}
+    >
+      {normalizedContent}
+    </ReactMarkdown>
+  );
+};
+

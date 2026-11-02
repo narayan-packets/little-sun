@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/gateway-proxy/:path*",
+      "destination": "https://<your-laptop>.<your-tailnet>.ts.net/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

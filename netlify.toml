@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Optional Edge proxy for Little Sun Gateway (Tailscale Funnel)
+# Replace <your-laptop>.<your-tailnet>.ts.net or set VITE_GATEWAY_URL in Netlify Environment Variables
+[[redirects]]
+  from = "/gateway-proxy/*"
+  to = "https://<your-laptop>.<your-tailnet>.ts.net/:splat"
+  status = 200
+  force = true
+
+# SPA client-side routing (/newchat, /settings, /account, /voices, /chat-001, /login, etc.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

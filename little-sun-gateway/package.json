@@ -1,0 +1,13 @@
+{
+  "name": "little-sun-gateway",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "jose": "^6.0.0"
+  }
+}
