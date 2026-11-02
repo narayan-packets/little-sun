@@ -1,6 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowDown, Keyboard, Menu, PanelLeft, Settings } from 'lucide-react';
+import {
+  ArrowDown,
+  BookOpen,
+  Calculator,
+  Code2,
+  Keyboard,
+  Menu,
+  PanelLeft,
+  PenLine,
+  Settings,
+} from 'lucide-react';
 import { useAppState } from '../state/store';
 import { Composer } from './Composer';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -8,6 +18,24 @@ import { MessageItem } from './MessageItem';
 import { ModelPicker } from './ModelPicker';
 import { StatusPill } from './StatusPill';
 import { SunMark } from './SunMark';
+
+const SUGGESTION_PILLS = [
+  { label: 'Write', icon: PenLine, prompt: 'Write a ' },
+  { label: 'Learn', icon: BookOpen, prompt: 'Explain ' },
+  { label: 'Code', icon: Code2, prompt: 'Write a program to ' },
+  { label: 'Solve Math', icon: Calculator, prompt: 'Can you solve this math problem step-by-step with LaTeX: ' },
+];
+
+function getHeroGreeting(name: string): string {
+  const hour = new Date().getHours();
+  let timeStr = 'Evening';
+  if (hour >= 5 && hour < 12) {
+    timeStr = 'Morning';
+  } else if (hour >= 12 && hour < 17) {
+    timeStr = 'Afternoon';
+  }
+  return name ? `${timeStr}, ${name}` : timeStr;
+}
 
 export const ChatView: React.FC = () => {
   const {
@@ -105,6 +133,7 @@ export const ChatView: React.FC = () => {
   }
 
   const isEmpty = messages.length === 0 && !isStreaming;
+  const heroGreeting = getHeroGreeting(userDisplayName);
 
   return (
     <main
@@ -239,120 +268,130 @@ export const ChatView: React.FC = () => {
         </motion.div>
       ) : isEmpty ? (
         <motion.div
-          key="new-chat-instance"
-          initial={{ opacity: 0, y: 10 }}
+          key="new-chat-hero"
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="flex-1 flex flex-col items-center justify-center px-4 select-none"
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+          className="flex-1 flex flex-col items-center justify-center px-4 select-none pb-12 sm:pb-16"
         >
-          <div className="flex flex-col items-center text-center max-w-[560px] mx-auto">
-            <div className="mb-4">
-              <SunMark size={42} state="waking" animated />
+          <div className="w-full max-w-[680px] mx-auto flex flex-col items-center">
+            {/* Claude-style Hero Greeting: SunMark + Time-aware Greeting in Editorial Serif */}
+            <div className="inline-flex items-center justify-center gap-3.5 mb-7 select-none">
+              <SunMark size={36} state="waking" animated />
+              <h1
+                className="text-3xl sm:text-4xl font-normal tracking-tight"
+                style={{
+                  fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+                  color: 'var(--text)',
+                }}
+              >
+                {heroGreeting}
+              </h1>
             </div>
 
-            <h1
-              className="text-2xl sm:text-3xl font-medium tracking-tight mb-6"
-              style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
-            >
-              How can I help, {userDisplayName}?
-            </h1>
+            {/* Centered Composer Card */}
+            <div className="w-full mb-4">
+              <Composer isHero />
+            </div>
 
-            {/* Minimal Starter Suggestion Pills */}
-            <div className="flex flex-wrap items-center justify-center gap-2 max-w-[480px]">
-              {[
-                { label: 'Explain a complex concept', prompt: 'Explain ' },
-                { label: 'Write or review code', prompt: 'Write a program to ' },
-                { label: 'Solve a math problem', prompt: 'Can you solve this math problem step-by-step with LaTeX: ' },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    setComposerDraft(item.prompt);
-                    const textarea = document.querySelector<HTMLTextAreaElement>('.composer-textarea');
-                    if (textarea) {
-                      textarea.focus();
-                    }
-                  }}
-                  className="px-3.5 py-1.5 text-xs font-medium border transition-all cursor-pointer hover:bg-[var(--surface-2)] active:scale-95 shadow-xs"
-                  style={{
-                    backgroundColor: 'var(--surface)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text-muted)',
-                    borderRadius: '9999px',
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
+            {/* Starter Suggestion Pills (Claude style with icons) */}
+            <div className="flex flex-wrap items-center justify-center gap-2 max-w-[620px]">
+              {SUGGESTION_PILLS.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      setComposerDraft(item.prompt);
+                      const textarea = document.querySelector<HTMLTextAreaElement>('.composer-textarea');
+                      if (textarea) {
+                        textarea.focus();
+                      }
+                    }}
+                    className="min-h-[34px] px-3.5 py-1.5 inline-flex items-center gap-2 text-xs font-medium border transition-all cursor-pointer hover:bg-[var(--surface-2)] active:scale-95 shadow-2xs"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                      borderRadius: '9999px',
+                    }}
+                  >
+                    <IconComponent className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+                    <span style={{ color: 'var(--text)' }}>{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </motion.div>
       ) : (
-        <div
-          key={activeChatId || 'active-chat-instance'}
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-4 sm:px-6 py-6"
-          style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
-        >
-          <div className="w-full max-w-[720px] mx-auto space-y-6">
-            {messages.map((msg) => (
-              <MessageItem
-                key={msg.id}
-                message={msg}
-                isLastAssistant={!isStreaming && msg.id === lastAssistantId}
-              />
-            ))}
-
-            {/* Streaming Assistant Message */}
-            {isStreaming && (
-              <div className="w-full flex flex-col items-start">
-                {streamingContent ? (
-                  <div className="w-full max-w-full min-w-0 ls-markdown">
-                    <MarkdownRenderer content={streamingContent} isStreaming />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2.5 py-1">
-                    <SunMark size={22} state="waking" animated />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Jump to latest button when user scrolled up */}
-      <AnimatePresence>
-        {!isEmpty && userScrolledUp && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute bottom-24 left-0 right-0 flex justify-center pointer-events-none z-20"
+        <>
+          <div
+            key={activeChatId || 'active-chat-instance'}
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto px-4 sm:px-6 py-6"
+            style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
           >
-            <button
-              type="button"
-              onClick={() => scrollToBottom('smooth')}
-              className="pointer-events-auto min-h-[38px] px-3.5 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium border shadow-md transition-colors cursor-pointer"
-              style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)',
-                borderRadius: '9999px',
-              }}
-            >
-              <span>Jump to latest</span>
-              <ArrowDown className="w-3.5 h-3.5" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div className="w-full max-w-[720px] mx-auto space-y-6">
+              {messages.map((msg) => (
+                <MessageItem
+                  key={msg.id}
+                  message={msg}
+                  isLastAssistant={!isStreaming && msg.id === lastAssistantId}
+                />
+              ))}
 
-      {/* Bottom Composer */}
-      <Composer />
+              {/* Streaming Assistant Message */}
+              {isStreaming && (
+                <div className="w-full flex flex-col items-start">
+                  {streamingContent ? (
+                    <div className="w-full max-w-full min-w-0 ls-markdown">
+                      <MarkdownRenderer content={streamingContent} isStreaming />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2.5 py-1">
+                      <SunMark size={22} state="waking" animated />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Jump to latest button when user scrolled up */}
+          <AnimatePresence>
+            {!isEmpty && userScrolledUp && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute bottom-24 left-0 right-0 flex justify-center pointer-events-none z-20"
+              >
+                <button
+                  type="button"
+                  onClick={() => scrollToBottom('smooth')}
+                  className="pointer-events-auto min-h-[38px] px-3.5 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium border shadow-md transition-colors cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  <span>Jump to latest</span>
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bottom Docked Composer */}
+          <Composer />
+        </>
+      )}
     </main>
   );
 };

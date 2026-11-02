@@ -10,7 +10,11 @@ function formatCompactTokens(n: number): string {
   return String(n);
 }
 
-export const Composer: React.FC = () => {
+export interface ComposerProps {
+  isHero?: boolean;
+}
+
+export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   const {
     activeChatId,
     composerDraft,
@@ -56,14 +60,15 @@ export const Composer: React.FC = () => {
     }
   }, [activeChatId, isInputBlocked]);
 
-  // Auto-grow textarea smoothly up to ~6 lines (approx 160px)
+  // Auto-grow textarea smoothly up to ~6 lines (approx 160-180px)
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    const nextHeight = Math.min(160, Math.max(44, el.scrollHeight));
+    const minH = isHero ? 52 : 40;
+    const nextHeight = Math.min(180, Math.max(minH, el.scrollHeight));
     el.style.height = `${nextHeight}px`;
-  }, [composerDraft]);
+  }, [composerDraft, isHero]);
 
   if (isAccessRestricted) {
     return null;
@@ -92,13 +97,21 @@ export const Composer: React.FC = () => {
 
   return (
     <div
-      className="w-full px-3 sm:px-5 pt-3 shrink-0 relative z-10"
-      style={{
-        background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 24%)',
-        paddingBottom: 'calc(0.85rem + env(safe-area-inset-bottom))',
-      }}
+      className={
+        isHero
+          ? 'w-full'
+          : 'w-full px-3 sm:px-5 pt-3 shrink-0 relative z-10'
+      }
+      style={
+        isHero
+          ? undefined
+          : {
+              background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 24%)',
+              paddingBottom: 'calc(0.85rem + env(safe-area-inset-bottom))',
+            }
+      }
     >
-      <div className="w-full max-w-[740px] mx-auto">
+      <div className={isHero ? 'w-full' : 'w-full max-w-[740px] mx-auto'}>
         {/* Minimal desktop & mobile optimized context window / token limit feedback */}
         <AnimatePresence initial={false}>
           {isNearLimit && (
@@ -259,19 +272,23 @@ export const Composer: React.FC = () => {
         )}
 
         <div
-          className="composer-card flex items-end gap-2 px-3.5 py-2.5 border"
+          className={`composer-card flex items-end gap-2 border transition-all ${
+            isHero
+              ? 'px-4 py-3 min-h-[88px] shadow-sm hover:shadow-md'
+              : 'px-3.5 py-2.5 min-h-[52px]'
+          }`}
           style={{
             backgroundColor: isInputBlocked ? 'var(--surface-2)' : 'var(--surface)',
             borderColor:
               isChatLimitReached || isDraftOverTurnLimit
                 ? 'var(--danger)'
                 : 'var(--border)',
-            borderRadius: '20px',
+            borderRadius: isHero ? '22px' : '20px',
           }}
         >
           <textarea
             ref={textareaRef}
-            rows={1}
+            rows={isHero ? 2 : 1}
             disabled={isInputBlocked}
             value={composerDraft}
             onChange={(e) => setComposerDraft(e.target.value)}
@@ -281,9 +298,13 @@ export const Composer: React.FC = () => {
                 ? 'Service currently offline'
                 : isChatLimitReached
                   ? 'Chat limit reached — start a new chat'
-                  : 'Reply to Little Sun…'
+                  : isHero
+                    ? 'How can I help you today?'
+                    : 'Reply to Little Sun…'
             }
-            className="composer-textarea flex-1 min-h-[40px] max-h-[160px] py-1.5 px-1 bg-transparent border-0 resize-none disabled:cursor-not-allowed"
+            className={`composer-textarea flex-1 max-h-[180px] py-1.5 px-1 bg-transparent border-0 resize-none disabled:cursor-not-allowed ${
+              isHero ? 'min-h-[50px]' : 'min-h-[40px]'
+            }`}
             style={{
               color: 'var(--text)',
               fontSize: '16px',
