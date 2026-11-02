@@ -85,17 +85,18 @@ export const SettingsPage: React.FC = () => {
     >
       {/* Top Header Bar */}
       <header
-        className="h-14 px-4 sm:px-6 border-b flex items-center justify-between gap-3 shrink-0"
+        className="px-3.5 sm:px-6 border-b flex items-center justify-between gap-3 shrink-0"
         style={{
           backgroundColor: 'var(--bg)',
           borderColor: 'var(--border)',
-          paddingTop: 'env(safe-area-inset-top)',
+          minHeight: '3.5rem',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
         }}
       >
         <button
           type="button"
           onClick={() => setIsSettingsOpen(false)}
-          className="min-h-[38px] px-2.5 py-1.5 inline-flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
+          className="min-h-[40px] px-2.5 py-1.5 inline-flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.98]"
           style={{
             color: 'var(--text)',
             borderRadius: 'var(--radius-sm)',
@@ -104,9 +105,11 @@ export const SettingsPage: React.FC = () => {
           title="Back to chat (Esc)"
         >
           <ArrowLeft className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
-          <span>Back to chat</span>
+          <span>
+            Back<span className="hidden sm:inline"> to chat</span>
+          </span>
           <kbd
-            className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono border select-none"
+            className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono border select-none ml-0.5"
             style={{
               borderColor: 'var(--border)',
               backgroundColor: 'var(--surface-2)',
@@ -118,25 +121,34 @@ export const SettingsPage: React.FC = () => {
           </kbd>
         </button>
 
+        {/* Mobile Page Title */}
+        <h1
+          className="text-sm font-semibold sm:hidden truncate"
+          style={{ color: 'var(--text)' }}
+        >
+          Settings
+        </h1>
+
         <div className="flex items-center gap-2 shrink-0">
           <StatusPill />
         </div>
       </header>
 
-      {/* Main Content: Centered and Top-Aligned */}
+      {/* Main Content: Centered and Top-Aligned with Safe-Area Inset Support */}
       <main
-        className="flex-1 overflow-y-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-16"
+        className="flex-1 overflow-y-auto px-4 sm:px-6 pt-5 sm:pt-8 pb-12 sm:pb-16"
         style={{
           WebkitOverflowScrolling: 'touch',
           overscrollBehaviorY: 'contain',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 3rem)',
         }}
       >
-        <div className="w-full max-w-[500px] mx-auto">
-          {/* Centered Horizontal Tabs (Account | Voices) */}
-          <div className="flex justify-center mb-8">
+        <div className="w-full max-w-[480px] mx-auto">
+          {/* Centered Horizontal Tabs (Account | Voices) with Responsive Segmented Control */}
+          <div className="flex justify-center mb-6 sm:mb-8">
             <nav
               aria-label="Settings navigation"
-              className="inline-flex p-1 border select-none"
+              className="w-full max-w-[340px] sm:w-auto grid grid-cols-2 sm:inline-flex p-1 border select-none"
               style={{
                 backgroundColor: 'var(--surface-2)',
                 borderColor: 'var(--border)',
@@ -149,9 +161,9 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('account');
                 }}
-                className={`min-h-[36px] px-6 py-1.5 inline-flex items-center gap-2 text-sm font-medium rounded-full transition-all cursor-pointer no-underline ${
+                className={`min-h-[40px] sm:min-h-[36px] px-3 sm:px-6 py-1.5 inline-flex items-center justify-center gap-2 text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'account'
-                    ? 'shadow-xs'
+                    ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
                 }`}
                 style={{
@@ -172,9 +184,9 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('voices');
                 }}
-                className={`min-h-[36px] px-6 py-1.5 inline-flex items-center gap-2 text-sm font-medium rounded-full transition-all cursor-pointer no-underline ${
+                className={`min-h-[40px] sm:min-h-[36px] px-3 sm:px-6 py-1.5 inline-flex items-center justify-center gap-2 text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'voices'
-                    ? 'shadow-xs'
+                    ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
                 }`}
                 style={{
@@ -205,7 +217,7 @@ export const SettingsPage: React.FC = () => {
                 className="space-y-4"
               >
                 <div
-                  className="border overflow-hidden divide-y"
+                  className="border overflow-hidden divide-y shadow-xs"
                   style={{
                     backgroundColor: 'var(--surface)',
                     borderColor: 'var(--border)',
@@ -213,7 +225,7 @@ export const SettingsPage: React.FC = () => {
                   }}
                 >
                   {/* Subdivision: Display Name */}
-                  <div className="p-5" style={{ borderColor: 'var(--border)' }}>
+                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
                     <div className="flex items-center justify-between mb-2">
                       <label
                         htmlFor="ls-settings-name"
@@ -223,7 +235,7 @@ export const SettingsPage: React.FC = () => {
                         Name
                       </label>
                       {nameSaved && (
-                        <span className="inline-flex items-center gap-1 text-xs text-[var(--success)]">
+                        <span className="inline-flex items-center gap-1 text-xs text-[var(--success)] font-medium">
                           <Check className="w-3.5 h-3.5" />
                           <span>Saved</span>
                         </span>
@@ -237,7 +249,7 @@ export const SettingsPage: React.FC = () => {
                       onChange={(e) => handleNameChange(e.target.value)}
                       placeholder="Your name"
                       maxLength={40}
-                      className="w-full h-10 px-3.5 text-sm border transition-colors focus:outline-none focus:border-[var(--accent)]"
+                      className="w-full h-11 sm:h-10 px-3.5 text-base sm:text-sm border transition-colors focus:outline-none focus:border-[var(--accent)]"
                       style={{
                         backgroundColor: 'var(--bg)',
                         borderColor: 'var(--border)',
@@ -245,29 +257,36 @@ export const SettingsPage: React.FC = () => {
                         color: 'var(--text)',
                       }}
                     />
-                    <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                       Shown in greetings and chat headers. Updates automatically.
                     </p>
                   </div>
 
                   {/* Subdivision: Email */}
                   <div
-                    className="p-5 flex items-center justify-between gap-3"
+                    className="p-4 sm:p-5 flex items-center justify-between gap-3"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
                         Email
                       </div>
-                      <div className="text-sm font-medium mt-0.5" style={{ color: 'var(--text)' }}>
+                      <div
+                        className="text-sm font-medium mt-0.5 truncate break-all sm:break-normal"
+                        style={{ color: 'var(--text)' }}
+                        title={session?.user.email || ''}
+                      >
                         {session?.user.email || 'you@example.com'}
                       </div>
                     </div>
                   </div>
 
                   {/* Subdivision: Sign out */}
-                  <div className="p-5 flex items-center justify-between gap-3" style={{ borderColor: 'var(--border)' }}>
-                    <div>
+                  <div
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <div className="min-w-0">
                       <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
                         Session
                       </div>
@@ -279,7 +298,7 @@ export const SettingsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={signOut}
-                      className="px-3.5 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium border transition-colors cursor-pointer hover:bg-red-500/10 active:scale-98"
+                      className="w-full sm:w-auto min-h-[40px] sm:min-h-[34px] px-4 py-2 inline-flex items-center justify-center gap-2 text-xs font-medium border transition-colors cursor-pointer hover:bg-red-500/10 active:scale-[0.98]"
                       style={{
                         backgroundColor: 'var(--surface-2)',
                         borderColor: 'var(--border)',
@@ -308,7 +327,7 @@ export const SettingsPage: React.FC = () => {
                 className="space-y-4"
               >
                 <div
-                  className="border overflow-hidden divide-y"
+                  className="border overflow-hidden divide-y shadow-xs"
                   style={{
                     backgroundColor: 'var(--surface)',
                     borderColor: 'var(--border)',
@@ -316,12 +335,12 @@ export const SettingsPage: React.FC = () => {
                   }}
                 >
                   {/* Subdivision 1: Available Voices */}
-                  <div className="p-5" style={{ borderColor: 'var(--border)' }}>
+                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
                     <div className="text-xs font-medium mb-3" style={{ color: 'var(--text-muted)' }}>
                       Available Voices
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-2 sm:gap-1.5">
                       {POCKET_VOICES.map((item) => {
                         const isSelected = item.id === voice;
                         return (
@@ -329,7 +348,7 @@ export const SettingsPage: React.FC = () => {
                             key={item.id}
                             type="button"
                             onClick={() => handleVoiceChange(item.id)}
-                            className="w-full min-h-[42px] px-3.5 py-2 flex items-center justify-between text-left text-sm border transition-colors cursor-pointer"
+                            className="w-full min-h-[46px] sm:min-h-[42px] px-3.5 sm:px-4 py-2.5 flex items-center justify-between text-left text-sm border transition-all cursor-pointer active:scale-[0.99]"
                             style={{
                               backgroundColor: isSelected ? 'var(--surface-2)' : 'var(--bg)',
                               borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
@@ -337,10 +356,10 @@ export const SettingsPage: React.FC = () => {
                               borderRadius: 'var(--radius-sm)',
                             }}
                           >
-                            <span className="font-medium">{item.label}</span>
+                            <span className="font-medium truncate">{item.label}</span>
                             {isSelected && (
                               <Check
-                                className="w-4 h-4 shrink-0"
+                                className="w-4 h-4 shrink-0 ml-2"
                                 style={{ color: 'var(--accent)' }}
                               />
                             )}
@@ -351,8 +370,8 @@ export const SettingsPage: React.FC = () => {
                   </div>
 
                   {/* Subdivision 2: Speaking Speed */}
-                  <div className="p-5" style={{ borderColor: 'var(--border)' }}>
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex items-center justify-between mb-3">
                       <label
                         htmlFor="ls-settings-tts-speed"
                         className="text-xs font-medium"
@@ -372,7 +391,7 @@ export const SettingsPage: React.FC = () => {
                             type="button"
                             onClick={handleResetSpeed}
                             title="Reset to 1.0x"
-                            className="p-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                            className="p-1.5 -mr-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                           </button>
@@ -388,13 +407,13 @@ export const SettingsPage: React.FC = () => {
                       step={0.05}
                       value={speed}
                       onChange={(e) => handleSpeedChange(Number(e.target.value))}
-                      className="w-full h-2 cursor-pointer accent-[#D9822B]"
+                      className="w-full h-2 cursor-pointer accent-[#D9822B] touch-none"
                       aria-label="Speaking Speed"
                     />
 
-                    <div className="flex justify-between text-[11px] font-mono mt-2" style={{ color: 'var(--text-muted)' }}>
+                    <div className="flex justify-between text-[11px] font-mono mt-2 select-none" style={{ color: 'var(--text-muted)' }}>
                       <span>0.75x</span>
-                      <span>1.0x</span>
+                      <span>1.0x (Normal)</span>
                       <span>1.5x</span>
                     </div>
                   </div>
