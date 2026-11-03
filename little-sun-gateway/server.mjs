@@ -281,6 +281,7 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
   const pathname = url.pathname;
+  logger.log('HTTP', `${req.method} ${pathname} (origin=${req.headers.origin || 'none'}, auth=${Boolean(req.headers.authorization)})`);
 
   // Public health check (includes custom favicon version if present on laptop)
   if (req.method === 'GET' && pathname === '/health') {

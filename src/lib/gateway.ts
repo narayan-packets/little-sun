@@ -101,6 +101,8 @@ const envGatewayUrl = (
   .trim()
   .replace(/\/+$/, '');
 
+const FALLBACK_FUNNEL_URL = 'https://narayan.tail360362.ts.net';
+
 export function getDirectGatewayUrl(): string {
   const custom = getCustomGatewayUrl();
   if (custom && !custom.includes('<laptop>') && !custom.includes('<your-laptop>')) {
@@ -109,7 +111,7 @@ export function getDirectGatewayUrl(): string {
   if (envGatewayUrl && !envGatewayUrl.includes('<laptop>') && !envGatewayUrl.includes('<your-laptop>')) {
     return envGatewayUrl;
   }
-  return '';
+  return FALLBACK_FUNNEL_URL;
 }
 
 let activeDirectBaseUrl: string | null = null;
@@ -153,15 +155,15 @@ function syncBrowserFavicon(baseUrl: string, faviconVersion: number | null | und
   }
 }
 
-async function pingHealthEndpoint(baseUrl: string, timeoutMs = 3500): Promise<boolean> {
+async function pingHealthEndpoint(baseUrl: string, timeoutMs = 4500): Promise<boolean> {
   if (!baseUrl) return false;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${baseUrl}/health`, {
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    const res = await fetch(`${baseUrl}/health${sep}_t=${Date.now()}`, {
       method: 'GET',
       signal: controller.signal,
-      cache: 'no-store',
     });
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('text/html') || !res.ok) {
@@ -206,7 +208,7 @@ export async function checkGatewayHealth(): Promise<boolean> {
     return true;
   }
 
-  // On remote/mobile, probe direct Funnel URL and server proxy concurrently with 6s timeout for cellular networks
+  // On remote/mobile, probe direct Funnel URL and server proxy concurrently with 8s timeout for cellular networks
   const candidates = Array.from(
     new Set([directUrl, proxyUrl, isLocalHost ? localLoopback : ''].filter(Boolean))
   );
@@ -214,7 +216,7 @@ export async function checkGatewayHealth(): Promise<boolean> {
   const results = await Promise.all(
     candidates.map(async (url) => ({
       url,
-      ok: await pingHealthEndpoint(url, 6000),
+      ok: await pingHealthEndpoint(url, 8000),
     }))
   );
 

@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { logger } from './logger.mjs';
 
 let cachedJwks = null;
 let cachedJwksUrl = null;
@@ -57,6 +58,7 @@ export async function verifySupabaseToken(authHeader) {
     }
 
     if (!payload || !payload.sub) {
+      logger.log('AUTH', 'Token rejected: missing sub claim in payload');
       return null;
     }
 
@@ -64,7 +66,28 @@ export async function verifySupabaseToken(authHeader) {
       id: String(payload.sub),
       email: typeof payload.email === 'string' ? payload.email : '',
     };
-  } catch {
+  } catch (err) {
+    logger.log('AUTH', `JWKS verification failed: ${err?.message || err}. Attempting Supabase API fallback...`);
+    try {
+      const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(4000),
+      });
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        if (userData?.id) {
+          logger.log('AUTH', `Supabase API verified client: ${userData.email || userData.id}`);
+          return {
+            id: String(userData.id),
+            email: typeof userData.email === 'string' ? userData.email : '',
+          };
+        }
+      }
+    } catch (fallbackErr) {
+      logger.log('AUTH', `Supabase API fallback error: ${fallbackErr?.message || fallbackErr}`);
+    }
     return null;
   }
 }
