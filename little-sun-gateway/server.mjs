@@ -120,8 +120,12 @@ function ensureTailscaleFunnelStarted() {
 
 function detectTailscaleFunnelUrl() {
   if (process.env.PUBLIC_FUNNEL_URL) {
-    detectedFunnelUrl = process.env.PUBLIC_FUNNEL_URL.trim().replace(/\/+$/, '');
-    return detectedFunnelUrl;
+    const parts = process.env.PUBLIC_FUNNEL_URL.split(/[\s,]+/).map((p) => p.trim().replace(/\/+$/, '')).filter(Boolean);
+    const httpsPart = parts.find((p) => p.startsWith('https://')) || parts[0];
+    if (httpsPart) {
+      detectedFunnelUrl = httpsPart;
+      return detectedFunnelUrl;
+    }
   }
   const bin = getTailscaleBin();
   try {

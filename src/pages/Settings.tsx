@@ -33,6 +33,7 @@ import {
   type CloudProviderId,
   MAX_API_KEYS,
 } from '../lib/cloudApi';
+import { sanitizeCandidateUrl } from '../lib/gateway';
 import { MAX_MEMORIES } from '../lib/memory';
 
 export const SettingsPage: React.FC = () => {
@@ -169,7 +170,11 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleTestGateway = async () => {
-    const target = gatewayInput.trim() || activeGatewayEndpoint || detectedFunnelUrl || 'http://127.0.0.1:8790';
+    const target =
+      sanitizeCandidateUrl(gatewayInput) ||
+      activeGatewayEndpoint ||
+      detectedFunnelUrl ||
+      'http://127.0.0.1:8790';
     setIsTestingGateway(true);
     setGatewayTestResult(null);
     try {
@@ -198,10 +203,12 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveGateway = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    const clean = sanitizeCandidateUrl(gatewayInput);
+    setGatewayInput(clean);
     setIsSavingGateway(true);
     setGatewayTestResult(null);
     try {
-      const ok = await updateGatewayUrl(gatewayInput.trim());
+      const ok = await updateGatewayUrl(clean);
       setGatewaySavedBanner(true);
       setTimeout(() => setGatewaySavedBanner(false), 2400);
       if (ok) {
@@ -227,7 +234,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleUseDetectedFunnel = () => {
     if (detectedFunnelUrl) {
-      setGatewayInput(detectedFunnelUrl);
+      setGatewayInput(sanitizeCandidateUrl(detectedFunnelUrl));
     }
   };
 

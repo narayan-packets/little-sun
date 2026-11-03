@@ -157,8 +157,15 @@ function syncBrowserFavicon(baseUrl: string, faviconVersion: number | null | und
 let lastDetectedFunnelUrl = '';
 const funnelDetectionListeners = new Set<(url: string) => void>();
 
+export function sanitizeCandidateUrl(raw: string): string {
+  if (!raw) return '';
+  const parts = raw.split(/[\s,]+/).map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean);
+  const https = parts.find((p) => p.startsWith('https://'));
+  return (https || parts[0] || '').replace(/\/+$/, '');
+}
+
 export function getDetectedFunnelUrl(): string {
-  return lastDetectedFunnelUrl;
+  return sanitizeCandidateUrl(lastDetectedFunnelUrl);
 }
 
 export function getActiveDirectGatewayUrl(): string | null {
@@ -185,7 +192,7 @@ export async function testGatewayUrl(url: string): Promise<{
   funnelUrl?: string;
   error?: string;
 }> {
-  const clean = url.trim().replace(/\/+$/, '');
+  const clean = sanitizeCandidateUrl(url);
   if (!clean) {
     return { ok: false, latencyMs: 0, error: 'Please enter a gateway URL.' };
   }
@@ -232,12 +239,13 @@ export async function testGatewayUrl(url: string): Promise<{
 }
 
 async function pingHealthEndpoint(baseUrl: string, timeoutMs = 4500): Promise<boolean> {
-  if (!baseUrl) return false;
+  const cleanUrl = sanitizeCandidateUrl(baseUrl);
+  if (!cleanUrl) return false;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const sep = baseUrl.includes('?') ? '&' : '?';
-    const res = await fetch(`${baseUrl}/health${sep}_t=${Date.now()}`, {
+    const sep = cleanUrl.includes('?') ? '&' : '?';
+    const res = await fetch(`${cleanUrl}/health${sep}_t=${Date.now()}`, {
       method: 'GET',
       signal: controller.signal,
     });
@@ -248,10 +256,10 @@ async function pingHealthEndpoint(baseUrl: string, timeoutMs = 4500): Promise<bo
     const data = await res.json();
     const ok = Boolean(data && data.ok === true);
     if (ok) {
-      syncBrowserFavicon(baseUrl, typeof data.faviconVersion === 'number' ? data.faviconVersion : null);
+      syncBrowserFavicon(cleanUrl, typeof data.faviconVersion === 'number' ? data.faviconVersion : null);
       if (typeof data.funnelUrl === 'string' && data.funnelUrl.trim()) {
-        const detected = data.funnelUrl.trim();
-        if (detected !== lastDetectedFunnelUrl) {
+        const detected = sanitizeCandidateUrl(data.funnelUrl);
+        if (detected && detected !== lastDetectedFunnelUrl) {
           lastDetectedFunnelUrl = detected;
           funnelDetectionListeners.forEach((fn) => fn(detected));
         }

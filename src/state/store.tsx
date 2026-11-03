@@ -41,6 +41,7 @@ import {
   notifyGatewayChatSwitch,
   onFunnelUrlDetected,
   sanitizeBackendModels,
+  sanitizeCandidateUrl,
   setCustomGatewayUrl,
   streamGatewayChat,
   testGatewayUrl,
@@ -912,7 +913,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateGatewayUrl = useCallback(
     async (url: string): Promise<boolean> => {
-      const clean = url.trim().replace(/\/+$/, '');
+      const clean = sanitizeCandidateUrl(url);
       setCustomGatewayUrl(clean);
       setCustomGatewayUrlState(clean);
       if (session?.user?.id) {
