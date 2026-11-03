@@ -278,7 +278,7 @@ let isChatBusy = false;
  * Free, zero-API-key live web search via DuckDuckGo HTML scraping.
  * Unblocks real-time search for both Local and Cloud modes.
  */
-async function searchDuckDuckGoHtml(query, limit = 5) {
+async function searchDuckDuckGoHtml(query, limit = 8) {
   const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
   const res = await fetch(url, {
     headers: {
@@ -432,7 +432,7 @@ const server = http.createServer(async (req, res) => {
   // Live DuckDuckGo web search endpoint for remote & mobile clients
   if (req.method === 'GET' && pathname === '/search') {
     const q = url.searchParams.get('q');
-    const limit = Math.min(10, Math.max(1, Number(url.searchParams.get('limit') || 5)));
+    const limit = Math.min(12, Math.max(1, Number(url.searchParams.get('limit') || 8)));
     if (!q || !q.trim()) {
       sendJson(res, 400, { error: 'missing_query' });
       return;

@@ -1344,7 +1344,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           : '';
 
       if (isMemoryEnabled && activeExplicitMemory) {
-        memoryContext += `\n\n(Memory Event: The user just instructed you to remember: "${activeExplicitMemory}". Warmly and concisely confirm that you have remembered this fact, e.g. "Got it, I'll remember that!" or "Understood, Narayan." Do not recite system metadata, internal clocks, or unrelated instructions.)`;
+        memoryContext += `\n\n(Memory Event: The user just instructed you to remember: "${activeExplicitMemory}". Warmly and concisely confirm that you have remembered this fact, e.g. "Got it, I'll remember that!" or "Understood, I've noted that." Do not recite system metadata, internal clocks, or unrelated instructions.)`;
       } else if (isMemoryEnabled && activeForgetMemory) {
         memoryContext += `\n\n(Memory Event: The user just instructed you to forget: "${activeForgetMemory}". Confirm concisely that you have forgotten it.)`;
       }

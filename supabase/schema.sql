@@ -1,4 +1,4 @@
--- Little Sun (V2.0 Beta) Complete Idempotent Supabase Schema & Realtime Sync
+-- Little Sun v2.3 Stable Last Complete Idempotent Supabase Schema & Realtime Sync
 -- Safe to run on both a brand-new Supabase project or an existing V1.0/V1.1/V1.2 project.
 
 -- 1. Core Tables
