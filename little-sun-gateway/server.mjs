@@ -68,7 +68,7 @@ const SITE_URLS = (process.env.SITE_URLS || '')
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*')
   .split(',')
-  .map((o) => o.trim())
+  .map((o) => o.trim().replace(/\/+$/, ''))
   .filter(Boolean);
 
 const llama = new LlamaManager({ llamaPort: LLAMA_PORT });
@@ -209,15 +209,23 @@ function checkRateLimit(userId) {
   return true;
 }
 
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.length === 0) return true;
+  const norm = origin.trim().replace(/\/+$/, '').toLowerCase();
+  return ALLOWED_ORIGINS.some((allowed) => {
+    const normAllowed = allowed.toLowerCase();
+    return normAllowed === norm || normAllowed === '*' || normAllowed === origin.toLowerCase();
+  });
+}
+
 function applyCors(req, res) {
   const origin = req.headers.origin;
-  const isWildcard = ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.length === 0;
-
-  if (isWildcard) {
+  if (isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  } else if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
+    if (origin) {
+      res.setHeader('Vary', 'Origin');
+    }
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
