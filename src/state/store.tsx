@@ -1289,15 +1289,19 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         minute: '2-digit',
         hour12: true,
       });
-      const temporalContext = `Temporal Context: Today is ${dateStr}. Current local time is ${timeStr}.`;
+      const temporalContext = `Today's date is ${dateStr}. Local time is ${timeStr}.`;
 
       // The Memory System (V2.1): Detect explicit memory directives and inject user memory context
       let currentMemories = memories;
+      let activeExplicitMemory: string | null = null;
+      let activeForgetMemory: string | null = null;
+
       if (isMemoryEnabled) {
         const lastUser = [...cleanedHistory].reverse().find((m) => m.role === 'user');
         if (lastUser?.content) {
           const explicitFact = extractExplicitMemory(lastUser.content);
           if (explicitFact) {
+            activeExplicitMemory = explicitFact;
             void addMemory(explicitFact).then((newMem) => {
               if (newMem) {
                 setMemoryNotification(`Remembered: "${newMem.content}"`);
@@ -1323,6 +1327,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               m.content.toLowerCase().includes(forgetFact.toLowerCase())
             );
             if (match) {
+              activeForgetMemory = match.content;
               void removeMemory(match.id).then(() => {
                 setMemoryNotification(`Forgotten: "${match.content}"`);
                 setTimeout(() => setMemoryNotification(null), 3600);
@@ -1333,10 +1338,16 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      const memoryContext =
+      let memoryContext =
         isMemoryEnabled && currentMemories.length > 0
           ? formatMemoriesForPrompt(currentMemories)
           : '';
+
+      if (isMemoryEnabled && activeExplicitMemory) {
+        memoryContext += `\n\n(Memory Event: The user just instructed you to remember: "${activeExplicitMemory}". Warmly and concisely confirm that you have remembered this fact, e.g. "Got it, I'll remember that!" or "Understood, Narayan." Do not recite system metadata, internal clocks, or unrelated instructions.)`;
+      } else if (isMemoryEnabled && activeForgetMemory) {
+        memoryContext += `\n\n(Memory Event: The user just instructed you to forget: "${activeForgetMemory}". Confirm concisely that you have forgotten it.)`;
+      }
 
       // Perform free live web search if enabled (works in both Local and Cloud modes)
       let liveWebContext = '';

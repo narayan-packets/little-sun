@@ -64,25 +64,26 @@ export function saveLocalMemories(memories: MemoryItem[]): void {
 export function extractExplicitMemory(text: string): string | null {
   const clean = text.trim();
   const patterns = [
-    /^(?:please\s+)?(?:remember|keep\s+in\s+mind|never\s+forget|don'?t\s+forget)\s*(?:that|this:|:)?\s+(.+)$/i,
-    /(?:^|\.\s+)(?:please\s+)?(?:remember|keep\s+in\s+mind|never\s+forget|don'?t\s+forget)\s*(?:that|this:|:)?\s+([^.!?\n]+)/i,
-    /^(?:take\s+note\s+that|note\s+that)\s+(.+)$/i,
+    /^(?:please\s+)?(?:remember|keep\s+in\s+mind|never\s+forget|don'?t\s+forget|note\s+down|take\s+note|note)\s*[,:;-]?\s*(?:that|this|about)?\s*[,:;-]?\s*(.+)$/i,
+    /(?:^|\.\s+)(?:please\s+)?(?:remember|keep\s+in\s+mind|never\s+forget|don'?t\s+forget|note\s+down|take\s+note)\s*[,:;-]?\s*(?:that|this|about)?\s*[,:;-]?\s*([^.!?\n]+)/i,
+    /^(?:make\s+a\s+note\s+that|be\s+aware\s+that)\s*[,:;-]?\s*(.+)$/i,
   ];
 
   for (const pat of patterns) {
     const m = clean.match(pat);
     if (m && m[1]) {
       let fact = m[1].trim().replace(/^['"]+|['"]+$/g, '').replace(/[.!?]+$/, '');
-      if (fact.length >= 4 && fact.length <= MAX_MEMORY_CHARS) {
+      if (fact.length >= 3 && fact.length <= MAX_MEMORY_CHARS) {
         fact = fact
+          .replace(/\bmy\s+name\s+is\b/gi, "User's name is")
           .replace(/\bI\s+am\b/gi, 'User is')
+          .replace(/\bI'm\b/gi, 'User is')
           .replace(/\bI\s+have\b/gi, 'User has')
           .replace(/\bI\s+prefer\b/gi, 'User prefers')
           .replace(/\bI\s+use\b/gi, 'User uses')
           .replace(/\bI\s+like\b/gi, 'User likes')
           .replace(/\bI\s+work\s+as\b/gi, 'User works as')
           .replace(/\bI\s+live\s+in\b/gi, 'User lives in')
-          .replace(/\bmy\s+name\s+is\b/gi, "User's name is")
           .replace(/\bmy\b/gi, "User's")
           .replace(/\bme\b/gi, 'User');
         return fact.charAt(0).toUpperCase() + fact.slice(1);
@@ -102,14 +103,14 @@ export function extractExplicitMemory(text: string): string | null {
 export function extractForgetMemoryQuery(text: string): string | null {
   const clean = text.trim();
   const patterns = [
-    /^(?:please\s+)?(?:forget|delete\s+memory|remove\s+memory)\s*(?:that|about|this:)?\s+(.+)$/i,
-    /^(?:don'?t\s+remember|stop\s+remembering)\s+(.+)$/i,
+    /^(?:please\s+)?(?:forget|delete\s+memory|remove\s+memory)\s*[,:;-]?\s*(?:that|about|this:)?\s*[,:;-]?\s*(.+)$/i,
+    /^(?:don'?t\s+remember|stop\s+remembering)\s*[,:;-]?\s*(.+)$/i,
   ];
   for (const pat of patterns) {
     const m = clean.match(pat);
     if (m && m[1]) {
       const q = m[1].trim().replace(/^['"]+|['"]+$/g, '').replace(/[.!?]+$/, '');
-      if (q.length >= 3) {
+      if (q.length >= 2) {
         return q.toLowerCase();
       }
     }
