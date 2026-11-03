@@ -117,3 +117,37 @@ begin
     and created_at < now() - interval '1 hour';
 end;
 $$;
+
+-- 7. The Memory System (V2.1)
+-- Stores structural user facts and preferences persistently across all models and devices
+create table if not exists public.memories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  content text not null,
+  category text default 'general',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_memories_user_created on public.memories (user_id, created_at desc);
+
+alter table public.memories enable row level security;
+
+drop policy if exists "own memories" on public.memories;
+create policy "own memories" on public.memories
+  for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+alter table public.memories replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'memories'
+  ) then
+    alter publication supabase_realtime add table public.memories;
+  end if;
+end $$;
+

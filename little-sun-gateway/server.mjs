@@ -522,7 +522,7 @@ const server = http.createServer(async (req, res) => {
 
     const rawMessages = Array.isArray(body.messages) ? body.messages : [];
     const sanitizedMessages = rawMessages
-      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant' || m.role === 'system') && typeof m.content === 'string')
       .map((m) => ({ role: m.role, content: m.content }));
 
     const totalChars = sanitizedMessages.reduce((acc, m) => acc + m.content.length, 0);
@@ -594,14 +594,21 @@ const server = http.createServer(async (req, res) => {
         hour12: true,
       });
 
+      const userProvidedSystem = sanitizedMessages
+        .filter((m) => m.role === 'system')
+        .map((m) => m.content)
+        .join('\n\n');
+      const chatMessages = sanitizedMessages.filter((m) => m.role !== 'system');
+
       const dynamicSystemPrompt = [
         modelCfg.systemPrompt,
+        userProvidedSystem,
         `Current Date & Time: Today is ${dateStr}. Current local time is ${timeStr}. When asked about today's date, day of the week, month, year, or time, answer directly and confidently using this information without stating your knowledge cutoff.`,
-      ].join('\n\n');
+      ].filter(Boolean).join('\n\n');
 
       const upstreamMessages = [
         { role: 'system', content: dynamicSystemPrompt },
-        ...sanitizedMessages,
+        ...chatMessages,
       ];
 
       const upstreamRes = await fetch(`http://127.0.0.1:${LLAMA_PORT}/v1/chat/completions`, {

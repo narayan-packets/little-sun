@@ -73,15 +73,30 @@ import {
   isTemporalQuery,
   performWebSearch,
 } from '../lib/webSearch';
+import {
+  clearAllMemoriesRows,
+  deleteMemoryRow,
+  extractExplicitMemory,
+  extractForgetMemoryQuery,
+  fetchMemories,
+  formatMemoriesForPrompt,
+  getIsMemoryEnabled,
+  insertMemoryRow,
+  type MemoryItem,
+  setIsMemoryEnabled as saveIsMemoryEnabled,
+} from '../lib/memory';
 
 export type LaptopUiStatus = 'offline' | 'sleeping' | 'waking' | 'ready' | 'busy';
 export type AppMode = 'local' | 'cloud';
-export type SettingsRouteSection = 'account' | 'gateway' | 'cloud' | 'voices';
+export type SettingsRouteSection = 'account' | 'memory' | 'gateway' | 'cloud' | 'voices';
 
 function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | null {
   const clean = pathname.replace(/\/+$/, '').toLowerCase();
   if (clean === '/settings' || clean === '/account' || clean === '/settings/account') {
     return 'account';
+  }
+  if (clean === '/memory' || clean === '/settings/memory') {
+    return 'memory';
   }
   if (clean === '/gateway' || clean === '/settings/gateway') {
     return 'gateway';
@@ -96,6 +111,7 @@ function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | 
 }
 
 function getPathForSettingsSection(section: SettingsRouteSection): string {
+  if (section === 'memory') return '/memory';
   if (section === 'gateway') return '/gateway';
   if (section === 'voices') return '/voices';
   if (section === 'cloud') return '/cloud';
@@ -251,6 +267,14 @@ interface AppStateContextValue {
   activeGatewayEndpoint: string | null;
   updateGatewayUrl: (url: string) => Promise<boolean>;
   testGatewayConnection: (url: string) => Promise<{ ok: boolean; latencyMs: number; error?: string }>;
+  memories: MemoryItem[];
+  isMemoryEnabled: boolean;
+  setIsMemoryEnabled: (enabled: boolean) => Promise<void>;
+  addMemory: (content: string, category?: string) => Promise<MemoryItem | null>;
+  removeMemory: (memoryId: string) => Promise<void>;
+  clearMemories: () => Promise<void>;
+  memoryNotification: string | null;
+  clearMemoryNotification: () => void;
 }
 
 export interface AttachmentItem {
@@ -436,6 +460,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [detectedFunnelUrl, setDetectedFunnelUrl] = useState<string>(() => getDetectedFunnelUrl());
   const [activeGatewayEndpoint, setActiveGatewayEndpoint] = useState<string | null>(() => getActiveDirectGatewayUrl());
 
+  // The Memory System (V2.1) State
+  const [memories, setMemories] = useState<MemoryItem[]>([]);
+  const [isMemoryEnabled, setIsMemoryEnabledState] = useState<boolean>(() => getIsMemoryEnabled());
+  const [memoryNotification, setMemoryNotification] = useState<string | null>(null);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [settingsSection, setSettingsSectionState] = useState<SettingsRouteSection>(() => {
     if (typeof window !== 'undefined') {
@@ -562,6 +591,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (typeof meta.tts_speed === 'number' && meta.tts_speed >= 0.75 && meta.tts_speed <= 1.5) {
       setSavedSpeed(meta.tts_speed, false);
     }
+    if (typeof meta.memory_enabled === 'boolean') {
+      setIsMemoryEnabledState(meta.memory_enabled);
+      saveIsMemoryEnabled(meta.memory_enabled);
+    }
     if (meta.gateway_url && typeof meta.gateway_url === 'string' && meta.gateway_url.trim()) {
       const cur = getCustomGatewayUrl();
       if (!cur || cur !== meta.gateway_url.trim()) {
@@ -585,6 +618,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (mounted) {
           setSession(s);
           hydrateSessionPreferences(s);
+          if (s?.user?.id) {
+            void fetchMemories(s.user.id).then((m) => {
+              if (mounted) setMemories(m);
+            });
+          }
           setAuthLoading(false);
         }
       })
@@ -601,7 +639,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setChats([]);
           setActiveChatId(null);
           setMessages([]);
+          setMemories([]);
+          setMemoryNotification(null);
           initialRouteResolvedRef.current = false;
+        } else {
+          void fetchMemories(s.user.id).then((m) => {
+            if (mounted) setMemories(m);
+          });
         }
       }
     });
@@ -699,10 +743,22 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     };
 
+    const syncMemoriesList = async () => {
+      try {
+        const mems = await fetchMemories(userId);
+        setMemories(mems);
+      } catch {
+        // ignore
+      }
+    };
+
     const unsubscribeRealtime = subscribeToRealtimeSync(userId, (scope, changedChatId) => {
-      void syncChatsList();
-      if (scope === 'messages') {
+      if (scope === 'chats') {
+        void syncChatsList();
+      } else if (scope === 'messages') {
         void syncActiveMessages(changedChatId);
+      } else if (scope === 'memories') {
+        void syncMemoriesList();
       }
     });
 
@@ -710,6 +766,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (document.visibilityState === 'visible') {
         void syncChatsList();
         void syncActiveMessages();
+        void syncMemoriesList();
       }
     };
 
@@ -875,6 +932,51 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const testGatewayConnection = useCallback(async (url: string) => {
     return await testGatewayUrl(url);
+  }, []);
+
+  const setIsMemoryEnabled = useCallback(
+    async (enabled: boolean) => {
+      setIsMemoryEnabledState(enabled);
+      saveIsMemoryEnabled(enabled);
+      if (session?.user?.id) {
+        await syncUserPreferences({ memory_enabled: enabled });
+      }
+    },
+    [session]
+  );
+
+  const addMemory = useCallback(
+    async (content: string, category?: string) => {
+      if (!session?.user?.id) return null;
+      const trimmed = content.trim();
+      if (!trimmed) return null;
+      if (memories.some((m) => m.content.toLowerCase() === trimmed.toLowerCase())) {
+        return null;
+      }
+      const row = await insertMemoryRow(session.user.id, trimmed, category as any);
+      setMemories((prev) => [row, ...prev.filter((m) => m.id !== row.id)]);
+      return row;
+    },
+    [session, memories]
+  );
+
+  const removeMemory = useCallback(
+    async (memoryId: string) => {
+      if (!session?.user?.id) return;
+      await deleteMemoryRow(session.user.id, memoryId);
+      setMemories((prev) => prev.filter((m) => m.id !== memoryId));
+    },
+    [session]
+  );
+
+  const clearMemories = useCallback(async () => {
+    if (!session?.user?.id) return;
+    await clearAllMemoriesRows(session.user.id);
+    setMemories([]);
+  }, [session]);
+
+  const clearMemoryNotification = useCallback(() => {
+    setMemoryNotification(null);
   }, []);
 
   const stopGenerating = useCallback(() => {
@@ -1181,6 +1283,53 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
       const temporalContext = `Temporal Context: Today is ${dateStr}. Current local time is ${timeStr}.`;
 
+      // The Memory System (V2.1): Detect explicit memory directives and inject user memory context
+      let currentMemories = memories;
+      if (isMemoryEnabled) {
+        const lastUser = [...cleanedHistory].reverse().find((m) => m.role === 'user');
+        if (lastUser?.content) {
+          const explicitFact = extractExplicitMemory(lastUser.content);
+          if (explicitFact) {
+            void addMemory(explicitFact).then((newMem) => {
+              if (newMem) {
+                setMemoryNotification(`Remembered: "${newMem.content}"`);
+                setTimeout(() => setMemoryNotification(null), 3600);
+              }
+            });
+            if (!currentMemories.some((m) => m.content.toLowerCase() === explicitFact.toLowerCase())) {
+              currentMemories = [
+                {
+                  id: generateUUID(),
+                  content: explicitFact,
+                  category: 'general',
+                  created_at: new Date().toISOString(),
+                },
+                ...currentMemories,
+              ];
+            }
+          }
+
+          const forgetFact = extractForgetMemoryQuery(lastUser.content);
+          if (forgetFact) {
+            const match = currentMemories.find((m) =>
+              m.content.toLowerCase().includes(forgetFact.toLowerCase())
+            );
+            if (match) {
+              void removeMemory(match.id).then(() => {
+                setMemoryNotification(`Forgotten: "${match.content}"`);
+                setTimeout(() => setMemoryNotification(null), 3600);
+              });
+              currentMemories = currentMemories.filter((m) => m.id !== match.id);
+            }
+          }
+        }
+      }
+
+      const memoryContext =
+        isMemoryEnabled && currentMemories.length > 0
+          ? formatMemoriesForPrompt(currentMemories)
+          : '';
+
       // Perform free live web search if enabled (works in both Local and Cloud modes)
       let liveWebContext = '';
       let searchSources: Array<{ title: string; url: string }> = [];
@@ -1239,7 +1388,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }
           const baseSystemPrompt =
             `You are Little Sun, a calm, direct, and thoughtful AI assistant. Answer questions concisely, naturally, and accurately. When calculations, math, or equations are involved, use LaTeX ($$...$$ or $...$). When generating images or videos, provide markdown image/video links. When generating vector graphics, output clean SVG in \`\`\`svg blocks. When generating subtitles, output valid timestamps in \`\`\`srt or \`\`\`vtt blocks.\n\n${temporalContext}`;
-          const fullSystemPrompt = baseSystemPrompt;
+          const fullSystemPrompt = [baseSystemPrompt, memoryContext].filter(Boolean).join('\n\n');
 
           await streamCloudChat({
             key: targetKey,
@@ -1265,11 +1414,15 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             },
           });
         } else {
+          const gatewayPayload = memoryContext
+            ? [{ role: 'system' as const, content: memoryContext }, ...contextualPayload]
+            : contextualPayload;
+
           await streamGatewayChat({
             accessToken: session.accessToken,
             chatId,
             model: modelId,
-            messages: contextualPayload,
+            messages: gatewayPayload,
             signal: controller.signal,
             onEvent: (evt) => {
               if (evt.type === 'status') {
@@ -1388,7 +1541,19 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setStreamingContent('');
       }
     },
-    [session, mode, effectiveCloudModels, allModels, cloudConfig, pollGateway, isWebSearchActive]
+    [
+      session,
+      mode,
+      effectiveCloudModels,
+      allModels,
+      cloudConfig,
+      pollGateway,
+      isWebSearchActive,
+      isMemoryEnabled,
+      memories,
+      addMemory,
+      removeMemory,
+    ]
   );
 
   const sendMessage = useCallback(
@@ -1697,6 +1862,14 @@ Here are generated document files ready for 1-click download:
       activeGatewayEndpoint,
       updateGatewayUrl,
       testGatewayConnection,
+      memories,
+      isMemoryEnabled,
+      setIsMemoryEnabled,
+      addMemory,
+      removeMemory,
+      clearMemories,
+      memoryNotification,
+      clearMemoryNotification,
     }),
     [
       session,
@@ -1753,6 +1926,14 @@ Here are generated document files ready for 1-click download:
       activeGatewayEndpoint,
       updateGatewayUrl,
       testGatewayConnection,
+      memories,
+      isMemoryEnabled,
+      setIsMemoryEnabled,
+      addMemory,
+      removeMemory,
+      clearMemories,
+      memoryNotification,
+      clearMemoryNotification,
     ]
   );
 

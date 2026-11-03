@@ -1,5 +1,5 @@
 export interface ChatMessagePayload {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
 }
 

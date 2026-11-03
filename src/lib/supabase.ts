@@ -6,6 +6,8 @@ export interface UserPreferencesMeta {
   tts_speed?: number;
   default_model_id?: string;
   gateway_url?: string;
+  memory_enabled?: boolean;
+  memories?: any[];
 }
 
 export interface UserSession {
@@ -486,7 +488,7 @@ export async function deleteMessageRow(userId: string, messageId: string): Promi
  */
 export function subscribeToRealtimeSync(
   userId: string,
-  onSyncNeeded: (scope: 'chats' | 'messages', chatId?: string) => void
+  onSyncNeeded: (scope: 'chats' | 'messages' | 'memories', targetId?: string) => void
 ): () => void {
   const cleanups: Array<() => void> = [];
 
@@ -524,6 +526,18 @@ export function subscribeToRealtimeSync(
           onSyncNeeded('messages', changedChatId);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'memories',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          onSyncNeeded('memories');
+        }
+      )
       .subscribe();
 
     cleanups.push(() => {
@@ -537,6 +551,8 @@ export function subscribeToRealtimeSync(
         onSyncNeeded('chats');
       } else if (e.key === LOCAL_MESSAGES_KEY) {
         onSyncNeeded('messages');
+      } else if (e.key === 'littlesun_memories_v1') {
+        onSyncNeeded('memories');
       }
     };
     window.addEventListener('storage', onStorage);

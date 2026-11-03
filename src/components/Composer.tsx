@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
   ArrowUp,
+  Brain,
   Clock,
   FileText,
   Globe,
@@ -58,6 +59,8 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
     startNewChat,
     continueInNewChat,
     clearFailedSendError,
+    memoryNotification,
+    clearMemoryNotification,
   } = useAppState();
 
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
@@ -314,6 +317,34 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
           className="hidden"
           onChange={handleFileInputChange}
         />
+
+        {/* Memory Stored / Forgotten Notification Pill */}
+        <AnimatePresence>
+          {memoryNotification && (
+            <motion.div
+              initial={{ opacity: 0, y: 4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.96 }}
+              className="mb-2 px-3 py-1.5 text-xs rounded-full border inline-flex items-center gap-2 shadow-2xs select-none max-w-full"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--text)',
+              }}
+            >
+              <Brain className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+              <span className="truncate">{memoryNotification}</span>
+              <button
+                type="button"
+                onClick={() => clearMemoryNotification()}
+                className="p-0.5 rounded-full hover:bg-neutral-500/15 cursor-pointer shrink-0 ml-auto"
+                aria-label="Dismiss"
+              >
+                <X className="w-3 h-3 text-[var(--text-muted)]" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Upload validation error notice */}
         {uploadError && (

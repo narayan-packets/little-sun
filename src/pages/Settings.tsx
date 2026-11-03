@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
+  Brain,
   Check,
   Cloud,
   Eye,
   EyeOff,
   LogOut,
+  Plus,
   RefreshCw,
   RotateCcw,
   Server,
@@ -31,6 +33,7 @@ import {
   type CloudProviderId,
   MAX_API_KEYS,
 } from '../lib/cloudApi';
+import { MAX_MEMORIES } from '../lib/memory';
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -56,12 +59,22 @@ export const SettingsPage: React.FC = () => {
     updateGatewayUrl,
     testGatewayConnection,
     refreshGateway,
+    memories,
+    isMemoryEnabled,
+    setIsMemoryEnabled,
+    addMemory,
+    removeMemory,
+    clearMemories,
   } = useAppState();
 
   const [nameInput, setNameInput] = useState(userDisplayName);
   const [nameSaved, setNameSaved] = useState(false);
   const [voice, setVoice] = useState<PocketVoiceId>(() => getSavedVoice());
   const [speed, setSpeed] = useState<number>(() => getSavedSpeed());
+
+  // Memory Form State
+  const [newMemoryText, setNewMemoryText] = useState('');
+  const [memoryAddedToast, setMemoryAddedToast] = useState(false);
 
   // Gateway Connection Form State
   const [gatewayInput, setGatewayInput] = useState(customGatewayUrl || '');
@@ -227,6 +240,24 @@ export const SettingsPage: React.FC = () => {
     });
   };
 
+  const handleManualAddMemory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newMemoryText.trim();
+    if (!clean) return;
+    const res = await addMemory(clean);
+    if (res) {
+      setNewMemoryText('');
+      setMemoryAddedToast(true);
+      setTimeout(() => setMemoryAddedToast(false), 2200);
+    }
+  };
+
+  const handleClearAllMemories = async () => {
+    if (window.confirm('Are you sure you want to clear all stored memories?')) {
+      await clearMemories();
+    }
+  };
+
   const currentTab =
     settingsSection === 'voices'
       ? 'voices'
@@ -234,6 +265,8 @@ export const SettingsPage: React.FC = () => {
       ? 'cloud'
       : settingsSection === 'gateway'
       ? 'gateway'
+      : settingsSection === 'memory'
+      ? 'memory'
       : 'account';
   const canAddMoreKeys = cloudConfig.keys.length < MAX_API_KEYS;
 
@@ -307,11 +340,11 @@ export const SettingsPage: React.FC = () => {
         }}
       >
         <div className="w-full max-w-[500px] mx-auto">
-          {/* Centered Segmented Navigation (Account | Gateway | Cloud API | Voices) */}
+          {/* Centered Segmented Navigation (Account | Memory | Gateway | Cloud API | Voices) */}
           <div className="flex justify-center mb-6 sm:mb-8">
             <nav
               aria-label="Settings navigation"
-              className="w-full max-w-[480px] grid grid-cols-4 p-1 border select-none rounded-full"
+              className="w-full max-w-[500px] grid grid-cols-5 p-1 border select-none rounded-full"
               style={{
                 backgroundColor: 'var(--surface-2)',
                 borderColor: 'var(--border)',
@@ -323,7 +356,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('account');
                 }}
-                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'account'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -341,12 +374,35 @@ export const SettingsPage: React.FC = () => {
               </a>
 
               <a
+                href="/memory"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openSettingsSection('memory');
+                }}
+                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                  currentTab === 'memory'
+                    ? 'shadow-xs font-semibold'
+                    : 'hover:text-[var(--text)]'
+                }`}
+                style={{
+                  backgroundColor: currentTab === 'memory' ? 'var(--surface)' : 'transparent',
+                  color: currentTab === 'memory' ? 'var(--text)' : 'var(--text-muted)',
+                }}
+              >
+                <Brain
+                  className="w-3.5 h-3.5 shrink-0"
+                  style={{ color: currentTab === 'memory' ? 'var(--accent)' : 'inherit' }}
+                />
+                <span>Memory</span>
+              </a>
+
+              <a
                 href="/gateway"
                 onClick={(e) => {
                   e.preventDefault();
                   openSettingsSection('gateway');
                 }}
-                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'gateway'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -369,7 +425,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('cloud');
                 }}
-                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'cloud'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -383,7 +439,7 @@ export const SettingsPage: React.FC = () => {
                   className="w-3.5 h-3.5 shrink-0"
                   style={{ color: currentTab === 'cloud' ? 'var(--accent)' : 'inherit' }}
                 />
-                <span>Cloud API</span>
+                <span>Cloud</span>
               </a>
 
               <a
@@ -392,7 +448,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('voices');
                 }}
-                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'voices'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -517,6 +573,243 @@ export const SettingsPage: React.FC = () => {
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Sign out</span>
                     </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ======================================================== */}
+            {/* TAB 2: Memory (Structural Facts, Preferences & Habits)  */}
+            {/* ======================================================== */}
+            {currentTab === 'memory' && (
+              <motion.div
+                key="tab-memory"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                className="space-y-4"
+              >
+                {/* Card 1: Memory Master Toggle & Capacity Meter */}
+                <div
+                  className="border overflow-hidden divide-y shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  <div
+                    className="p-4 sm:p-5 flex items-center justify-between gap-3"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent)' }}
+                      >
+                        <Brain className="w-4.5 h-4.5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          The Memory
+                        </h2>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Stores personal context, preferences, and facts across all models
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Master Toggle */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isMemoryEnabled}
+                      onClick={() => setIsMemoryEnabled(!isMemoryEnabled)}
+                      className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
+                        isMemoryEnabled ? 'bg-[var(--accent)]' : 'bg-[var(--surface-2)] border border-[var(--border)]'
+                      }`}
+                      title={isMemoryEnabled ? 'Disable memory' : 'Enable memory'}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                          isMemoryEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Storage Capacity Bar & Info */}
+                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span style={{ color: 'var(--text-muted)' }}>Memory capacity</span>
+                      <span className="font-mono font-medium" style={{ color: 'var(--text)' }}>
+                        {memories.length} / {MAX_MEMORIES} slots
+                      </span>
+                    </div>
+                    <div
+                      className="w-full h-2 rounded-full overflow-hidden"
+                      style={{ backgroundColor: 'var(--surface-2)' }}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(100, (memories.length / MAX_MEMORIES) * 100)}%`,
+                          backgroundColor:
+                            memories.length >= MAX_MEMORIES
+                              ? 'var(--danger)'
+                              : memories.length >= MAX_MEMORIES * 0.8
+                              ? '#f59e0b'
+                              : 'var(--accent)',
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs mt-2.5" style={{ color: 'var(--text-muted)' }}>
+                      Local (GGUF) and Cloud models access these facts automatically to personalize answers.
+                    </p>
+                  </div>
+
+                  {/* Manual Add Memory Row */}
+                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
+                    <label
+                      htmlFor="ls-new-memory-input"
+                      className="block text-xs font-medium mb-1.5"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Add Memory Manually
+                    </label>
+                    <form onSubmit={handleManualAddMemory} className="flex gap-2">
+                      <input
+                        id="ls-new-memory-input"
+                        type="text"
+                        value={newMemoryText}
+                        onChange={(e) => setNewMemoryText(e.target.value)}
+                        placeholder="e.g. Prefers TypeScript, building Little Sun project"
+                        maxLength={280}
+                        disabled={!isMemoryEnabled || memories.length >= MAX_MEMORIES}
+                        className="flex-1 h-10 px-3.5 text-xs sm:text-sm border transition-colors focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                        style={{
+                          backgroundColor: 'var(--bg)',
+                          borderColor: 'var(--border)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--text)',
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!newMemoryText.trim() || !isMemoryEnabled || memories.length >= MAX_MEMORIES}
+                        className="min-h-[40px] px-3.5 py-1.5 text-xs font-semibold rounded transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 shrink-0 active:scale-[0.98] shadow-xs"
+                        style={{
+                          backgroundColor: 'var(--accent)',
+                          color: 'var(--accent-contrast)',
+                        }}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add</span>
+                      </button>
+                    </form>
+
+                    {memoryAddedToast && (
+                      <div className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Memory saved</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 2: Memory Items List */}
+                <div
+                  className="border overflow-hidden divide-y shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  <div
+                    className="p-4 sm:p-5 flex items-center justify-between gap-3"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <div>
+                      <h3 className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                        Stored Facts & Preferences ({memories.length})
+                      </h3>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Say &quot;Remember that...&quot; in any chat, or delete entries below
+                      </p>
+                    </div>
+
+                    {memories.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAllMemories}
+                        className="text-xs text-[var(--danger)] hover:underline cursor-pointer transition-colors"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="p-4 sm:p-5 space-y-2.5" style={{ borderColor: 'var(--border)' }}>
+                    {memories.length === 0 ? (
+                      <div className="py-6 text-center">
+                        <Brain className="w-7 h-7 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-muted)' }} />
+                        <p className="text-xs font-medium" style={{ color: 'var(--text)' }}>
+                          No memories stored yet
+                        </p>
+                        <p className="text-xs mt-1 max-w-[320px] mx-auto" style={{ color: 'var(--text-muted)' }}>
+                          Tell Little Sun &quot;Remember that I live in Tokyo&quot; in any chat, or add a preference above.
+                        </p>
+                      </div>
+                    ) : (
+                      memories.map((m) => (
+                        <div
+                          key={m.id}
+                          className="p-3 rounded-lg border flex items-start justify-between gap-3 transition-colors group"
+                          style={{
+                            backgroundColor: 'var(--surface-2)',
+                            borderColor: 'var(--border)',
+                          }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="text-xs sm:text-sm font-medium leading-relaxed"
+                              style={{ color: 'var(--text)' }}
+                            >
+                              {m.content}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider"
+                                style={{
+                                  backgroundColor: 'var(--surface)',
+                                  color: 'var(--accent)',
+                                }}
+                              >
+                                {m.category || 'general'}
+                              </span>
+                              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                {new Date(m.created_at).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeMemory(m.id)}
+                            className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--surface)] transition-colors cursor-pointer shrink-0"
+                            title="Delete memory"
+                            aria-label="Delete memory"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </motion.div>
