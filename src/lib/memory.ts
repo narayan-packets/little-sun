@@ -288,3 +288,4 @@ export async function clearAllMemoriesRows(userId: string): Promise<void> {
     void syncUserPreferences({ memories: [] } as UserPreferencesMeta);
   }
 }
+

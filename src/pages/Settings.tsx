@@ -340,11 +340,11 @@ export const SettingsPage: React.FC = () => {
         }}
       >
         <div className="w-full max-w-[500px] mx-auto">
-          {/* Centered Segmented Navigation (Account | Memory | Gateway | Cloud API | Voices) */}
+          {/* Centered Segmented Navigation (Account | Memory | Gateway | Cloud | Voices) */}
           <div className="flex justify-center mb-6 sm:mb-8">
             <nav
               aria-label="Settings navigation"
-              className="w-full max-w-[500px] grid grid-cols-5 p-1 border select-none rounded-full"
+              className="w-full max-w-[520px] flex items-center justify-between p-1 border select-none rounded-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               style={{
                 backgroundColor: 'var(--surface-2)',
                 borderColor: 'var(--border)',
@@ -356,7 +356,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('account');
                 }}
-                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'account'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -379,7 +379,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('memory');
                 }}
-                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'memory'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -402,7 +402,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('gateway');
                 }}
-                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'gateway'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -425,7 +425,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('cloud');
                 }}
-                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'cloud'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -448,7 +448,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('voices');
                 }}
-                className={`min-h-[38px] px-1 sm:px-2 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'voices'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -590,7 +590,7 @@ export const SettingsPage: React.FC = () => {
                 transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
                 className="space-y-4"
               >
-                {/* Card 1: Memory Master Toggle & Capacity Meter */}
+                {/* Master Switch & Quick Add Card */}
                 <div
                   className="border overflow-hidden divide-y shadow-xs"
                   style={{
@@ -603,19 +603,19 @@ export const SettingsPage: React.FC = () => {
                     className="p-4 sm:p-5 flex items-center justify-between gap-3"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0"
                         style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent)' }}
                       >
-                        <Brain className="w-4.5 h-4.5" />
+                        <Brain className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                       </div>
-                      <div>
-                        <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                          The Memory
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+                          Memory
                         </h2>
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          Stores personal context, preferences, and facts across all models
+                        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                          Preferences and facts remembered across chats
                         </p>
                       </div>
                     </div>
@@ -629,7 +629,7 @@ export const SettingsPage: React.FC = () => {
                       className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
                         isMemoryEnabled ? 'bg-[var(--accent)]' : 'bg-[var(--surface-2)] border border-[var(--border)]'
                       }`}
-                      title={isMemoryEnabled ? 'Disable memory' : 'Enable memory'}
+                      title={isMemoryEnabled ? 'Pause memory' : 'Enable memory'}
                     >
                       <div
                         className={`w-4 h-4 rounded-full bg-white transition-transform ${
@@ -639,86 +639,84 @@ export const SettingsPage: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Storage Capacity Bar & Info */}
-                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span style={{ color: 'var(--text-muted)' }}>Memory capacity</span>
-                      <span className="font-mono font-medium" style={{ color: 'var(--text)' }}>
-                        {memories.length} / {MAX_MEMORIES} slots
-                      </span>
+                  {!isMemoryEnabled ? (
+                    <div className="p-4 sm:p-5 text-xs" style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
+                      Memory is paused. Little Sun will not save or apply personal facts to prompts.
                     </div>
-                    <div
-                      className="w-full h-2 rounded-full overflow-hidden"
-                      style={{ backgroundColor: 'var(--surface-2)' }}
-                    >
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${Math.min(100, (memories.length / MAX_MEMORIES) * 100)}%`,
-                          backgroundColor:
-                            memories.length >= MAX_MEMORIES
-                              ? 'var(--danger)'
-                              : memories.length >= MAX_MEMORIES * 0.8
-                              ? '#f59e0b'
-                              : 'var(--accent)',
-                        }}
-                      />
-                    </div>
-                    <p className="text-xs mt-2.5" style={{ color: 'var(--text-muted)' }}>
-                      Local (GGUF) and Cloud models access these facts automatically to personalize answers.
-                    </p>
-                  </div>
-
-                  {/* Manual Add Memory Row */}
-                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
-                    <label
-                      htmlFor="ls-new-memory-input"
-                      className="block text-xs font-medium mb-1.5"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      Add Memory Manually
-                    </label>
-                    <form onSubmit={handleManualAddMemory} className="flex gap-2">
-                      <input
-                        id="ls-new-memory-input"
-                        type="text"
-                        value={newMemoryText}
-                        onChange={(e) => setNewMemoryText(e.target.value)}
-                        placeholder="e.g. Prefers TypeScript, building Little Sun project"
-                        maxLength={280}
-                        disabled={!isMemoryEnabled || memories.length >= MAX_MEMORIES}
-                        className="flex-1 h-10 px-3.5 text-xs sm:text-sm border transition-colors focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
-                        style={{
-                          backgroundColor: 'var(--bg)',
-                          borderColor: 'var(--border)',
-                          borderRadius: 'var(--radius-sm)',
-                          color: 'var(--text)',
-                        }}
-                      />
-                      <button
-                        type="submit"
-                        disabled={!newMemoryText.trim() || !isMemoryEnabled || memories.length >= MAX_MEMORIES}
-                        className="min-h-[40px] px-3.5 py-1.5 text-xs font-semibold rounded transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 shrink-0 active:scale-[0.98] shadow-xs"
-                        style={{
-                          backgroundColor: 'var(--accent)',
-                          color: 'var(--accent-contrast)',
-                        }}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add</span>
-                      </button>
-                    </form>
-
-                    {memoryAddedToast && (
-                      <div className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Memory saved</span>
+                  ) : (
+                    <>
+                      {/* Slim Capacity Line */}
+                      <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex items-center justify-between text-xs mb-2">
+                          <span style={{ color: 'var(--text-muted)' }}>Storage capacity</span>
+                          <span className="font-mono text-xs font-medium" style={{ color: 'var(--text)' }}>
+                            {memories.length} / {MAX_MEMORIES}
+                          </span>
+                        </div>
+                        <div
+                          className="w-full h-1.5 rounded-full overflow-hidden"
+                          style={{ backgroundColor: 'var(--surface-2)' }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.min(100, (memories.length / MAX_MEMORIES) * 100)}%`,
+                              backgroundColor:
+                                memories.length >= MAX_MEMORIES
+                                  ? 'var(--danger)'
+                                  : memories.length >= MAX_MEMORIES * 0.8
+                                  ? '#f59e0b'
+                                  : 'var(--accent)',
+                            }}
+                          />
+                        </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Clean Single-Row Manual Add Form */}
+                      <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
+                        <form onSubmit={handleManualAddMemory} className="flex items-center gap-2">
+                          <input
+                            id="ls-new-memory-input"
+                            type="text"
+                            value={newMemoryText}
+                            onChange={(e) => setNewMemoryText(e.target.value)}
+                            placeholder="Remember a preference or fact..."
+                            maxLength={280}
+                            disabled={memories.length >= MAX_MEMORIES}
+                            className="flex-1 h-10 px-3.5 text-xs sm:text-sm border transition-colors focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 min-w-0"
+                            style={{
+                              backgroundColor: 'var(--bg)',
+                              borderColor: 'var(--border)',
+                              borderRadius: 'var(--radius-sm)',
+                              color: 'var(--text)',
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            disabled={!newMemoryText.trim() || memories.length >= MAX_MEMORIES}
+                            className="h-10 px-3.5 text-xs font-semibold rounded transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 shrink-0 active:scale-[0.98]"
+                            style={{
+                              backgroundColor: 'var(--accent)',
+                              color: 'var(--accent-contrast)',
+                            }}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add</span>
+                          </button>
+                        </form>
+
+                        {memoryAddedToast && (
+                          <div className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Memory saved</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                {/* Card 2: Memory Items List */}
+                {/* Saved Memories Card */}
                 <div
                   className="border overflow-hidden divide-y shadow-xs"
                   style={{
@@ -731,14 +729,9 @@ export const SettingsPage: React.FC = () => {
                     className="p-4 sm:p-5 flex items-center justify-between gap-3"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <div>
-                      <h3 className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
-                        Stored Facts & Preferences ({memories.length})
-                      </h3>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Say &quot;Remember that...&quot; in any chat, or delete entries below
-                      </p>
-                    </div>
+                    <h3 className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                      Saved Memories ({memories.length})
+                    </h3>
 
                     {memories.length > 0 && (
                       <button
@@ -751,22 +744,22 @@ export const SettingsPage: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="p-4 sm:p-5 space-y-2.5" style={{ borderColor: 'var(--border)' }}>
+                  <div className="p-3 sm:p-4 space-y-2" style={{ borderColor: 'var(--border)' }}>
                     {memories.length === 0 ? (
-                      <div className="py-6 text-center">
-                        <Brain className="w-7 h-7 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-muted)' }} />
+                      <div className="py-8 text-center">
+                        <Brain className="w-6 h-6 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-muted)' }} />
                         <p className="text-xs font-medium" style={{ color: 'var(--text)' }}>
-                          No memories stored yet
+                          No memories saved yet
                         </p>
-                        <p className="text-xs mt-1 max-w-[320px] mx-auto" style={{ color: 'var(--text-muted)' }}>
-                          Tell Little Sun &quot;Remember that I live in Tokyo&quot; in any chat, or add a preference above.
+                        <p className="text-xs mt-1 max-w-[280px] mx-auto" style={{ color: 'var(--text-muted)' }}>
+                          Ask Little Sun to remember something in chat, or add one above.
                         </p>
                       </div>
                     ) : (
                       memories.map((m) => (
                         <div
                           key={m.id}
-                          className="p-3 rounded-lg border flex items-start justify-between gap-3 transition-colors group"
+                          className="p-3 rounded-lg border flex items-start justify-between gap-3 transition-colors"
                           style={{
                             backgroundColor: 'var(--surface-2)',
                             borderColor: 'var(--border)',
@@ -774,7 +767,7 @@ export const SettingsPage: React.FC = () => {
                         >
                           <div className="min-w-0 flex-1">
                             <p
-                              className="text-xs sm:text-sm font-medium leading-relaxed"
+                              className="text-xs sm:text-sm font-medium leading-relaxed break-words"
                               style={{ color: 'var(--text)' }}
                             >
                               {m.content}
@@ -816,7 +809,7 @@ export const SettingsPage: React.FC = () => {
             )}
 
             {/* ======================================================== */}
-            {/* TAB 2: Gateway (Local Inference & Tailscale Funnel)     */}
+            {/* TAB 3: Gateway (Local Inference & Tailscale Funnel)     */}
             {/* ======================================================== */}
             {currentTab === 'gateway' && (
               <motion.div
@@ -827,7 +820,7 @@ export const SettingsPage: React.FC = () => {
                 transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
                 className="space-y-4"
               >
-                {/* Card 1: Connection Status & Endpoint Configuration */}
+                {/* Connection Status & Endpoint Card */}
                 <div
                   className="border overflow-hidden divide-y shadow-xs"
                   style={{
@@ -841,19 +834,19 @@ export const SettingsPage: React.FC = () => {
                     className="p-4 sm:p-5 flex items-center justify-between gap-3"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0"
                         style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent)' }}
                       >
-                        <Server className="w-4.5 h-4.5" />
+                        <Server className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                       </div>
-                      <div>
-                        <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                          Inference Gateway
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+                          Gateway
                         </h2>
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          Self-hosted LLMs & TTS over LAN or Tailscale Funnel
+                        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                          Local models and TTS via network or Tailscale
                         </p>
                       </div>
                     </div>
@@ -883,54 +876,50 @@ export const SettingsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Active Endpoint Info */}
+                  {/* Endpoint Info & Config */}
                   <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        Active Connection Endpoint
-                      </span>
+                    <div className="flex items-center justify-between gap-2 mb-3 text-xs">
+                      <span style={{ color: 'var(--text-muted)' }}>Active endpoint</span>
                       <span
-                        className="text-xs font-mono px-2 py-0.5 rounded border max-w-full truncate"
+                        className="font-mono px-2 py-0.5 rounded border max-w-[200px] sm:max-w-xs truncate"
                         style={{
                           backgroundColor: 'var(--surface-2)',
                           borderColor: 'var(--border)',
                           color: activeGatewayEndpoint ? 'var(--text)' : 'var(--text-muted)',
                         }}
                       >
-                        {activeGatewayEndpoint || 'None (probing candidates)'}
+                        {activeGatewayEndpoint || 'None'}
                       </span>
                     </div>
 
-                    {/* Detected Tailscale Funnel URL from Local Laptop */}
-                    {detectedFunnelUrl && (
+                    {/* Detected Tailscale Funnel Banner */}
+                    {detectedFunnelUrl && gatewayInput.trim() !== detectedFunnelUrl && (
                       <div
-                        className="mb-4 p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                        className="mb-3.5 p-2.5 sm:p-3 rounded-lg border flex items-center justify-between gap-2.5 text-xs"
                         style={{
                           backgroundColor: 'var(--surface-2)',
                           borderColor: 'var(--border)',
                         }}
                       >
                         <div className="min-w-0 flex-1">
-                          <span className="text-[11px] font-semibold text-[var(--accent)] uppercase tracking-wider block mb-0.5">
-                            Laptop Tailscale Funnel Detected
+                          <span className="text-[11px] font-medium text-[var(--accent)] block">
+                            Funnel detected
                           </span>
-                          <p className="text-xs font-mono truncate" style={{ color: 'var(--text)' }}>
+                          <span className="font-mono text-xs truncate block" style={{ color: 'var(--text)' }}>
                             {detectedFunnelUrl}
-                          </p>
+                          </span>
                         </div>
-                        {gatewayInput.trim() !== detectedFunnelUrl && (
-                          <button
-                            type="button"
-                            onClick={handleUseDetectedFunnel}
-                            className="px-2.5 py-1 text-xs font-medium rounded border transition-colors cursor-pointer shrink-0 hover:bg-[var(--surface)] active:scale-[0.98]"
-                            style={{
-                              borderColor: 'var(--border)',
-                              color: 'var(--text)',
-                            }}
-                          >
-                            Use Funnel URL
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={handleUseDetectedFunnel}
+                          className="px-2.5 py-1 text-xs font-medium rounded border transition-colors cursor-pointer shrink-0 hover:bg-[var(--surface)] active:scale-[0.98]"
+                          style={{
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)',
+                          }}
+                        >
+                          Use this
+                        </button>
                       </div>
                     )}
 
@@ -942,15 +931,15 @@ export const SettingsPage: React.FC = () => {
                           className="block text-xs font-medium mb-1.5"
                           style={{ color: 'var(--text-muted)' }}
                         >
-                          Gateway URL (Public Funnel or Local Host)
+                          Gateway URL
                         </label>
                         <input
                           id="ls-gateway-url-input"
                           type="text"
                           value={gatewayInput}
                           onChange={(e) => setGatewayInput(e.target.value)}
-                          placeholder="https://narayan.tail360362.ts.net or http://127.0.0.1:8790"
-                          className="w-full h-11 sm:h-10 px-3.5 text-base sm:text-sm font-mono border transition-colors focus:outline-none focus:border-[var(--accent)]"
+                          placeholder="https://your-node.ts.net or http://127.0.0.1:8790"
+                          className="w-full h-10 px-3.5 text-xs sm:text-sm font-mono border transition-colors focus:outline-none focus:border-[var(--accent)]"
                           style={{
                             backgroundColor: 'var(--bg)',
                             borderColor: 'var(--border)',
@@ -959,14 +948,14 @@ export const SettingsPage: React.FC = () => {
                           }}
                         />
                         <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                          Saved to your Supabase profile and synced to your mobile phone automatically.
+                          Synced across your devices for seamless mobile access.
                         </p>
                       </div>
 
-                      {/* Test / Save Banner Feedback */}
+                      {/* Test / Save Feedback */}
                       {gatewayTestResult && (
                         <div
-                          className={`p-3 rounded-lg text-xs font-medium flex items-center gap-2 border ${
+                          className={`p-2.5 sm:p-3 rounded-lg text-xs font-medium flex items-center gap-2 border ${
                             gatewayTestResult.ok
                               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
                               : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400'
@@ -982,18 +971,18 @@ export const SettingsPage: React.FC = () => {
                       )}
 
                       {gatewaySavedBanner && !gatewayTestResult && (
-                        <div className="p-3 rounded-lg text-xs font-medium flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                        <div className="p-2.5 sm:p-3 rounded-lg text-xs font-medium flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
                           <Check className="w-4 h-4 shrink-0" />
                           <span>Gateway preferences updated</span>
                         </div>
                       )}
 
                       {/* Action Buttons */}
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-1">
                         <button
                           type="submit"
                           disabled={isSavingGateway}
-                          className="min-h-[38px] px-4 py-1.5 text-xs font-semibold rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] inline-flex items-center gap-1.5 shadow-xs"
+                          className="h-10 sm:h-9 px-3.5 py-1.5 text-xs font-semibold rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] inline-flex items-center justify-center gap-1.5 shadow-xs"
                           style={{
                             backgroundColor: 'var(--accent)',
                             color: 'var(--accent-contrast)',
@@ -1002,7 +991,7 @@ export const SettingsPage: React.FC = () => {
                           {isSavingGateway ? (
                             <>
                               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                              <span>Connecting...</span>
+                              <span>Saving...</span>
                             </>
                           ) : (
                             <>
@@ -1016,25 +1005,25 @@ export const SettingsPage: React.FC = () => {
                           type="button"
                           disabled={isTestingGateway}
                           onClick={handleTestGateway}
-                          className="min-h-[38px] px-3.5 py-1.5 text-xs font-medium rounded border transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.98] inline-flex items-center gap-1.5 disabled:opacity-50"
+                          className="h-10 sm:h-9 px-3.5 py-1.5 text-xs font-medium rounded border transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.98] inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
                           style={{
                             borderColor: 'var(--border)',
                             color: 'var(--text)',
                           }}
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${isTestingGateway ? 'animate-spin' : ''}`} />
-                          <span>{isTestingGateway ? 'Testing...' : 'Test Connection'}</span>
+                          <span>{isTestingGateway ? 'Testing...' : 'Test'}</span>
                         </button>
 
                         {(gatewayInput || customGatewayUrl) && (
                           <button
                             type="button"
                             onClick={handleResetGateway}
-                            className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer inline-flex items-center gap-1 ml-auto"
+                            className="col-span-2 sm:col-span-1 sm:ml-auto h-8 px-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer inline-flex items-center justify-center gap-1"
                             title="Reset to default local & env candidates"
                           >
                             <RotateCcw className="w-3 h-3" />
-                            <span>Reset</span>
+                            <span>Reset to default</span>
                           </button>
                         )}
                       </div>
@@ -1042,7 +1031,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Card 2: Connected Local Models */}
+                {/* Local Models Card */}
                 <div
                   className="border overflow-hidden divide-y shadow-xs"
                   style={{
@@ -1057,10 +1046,10 @@ export const SettingsPage: React.FC = () => {
                   >
                     <div>
                       <h3 className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
-                        Detected Local Models ({allModels.filter((m) => m.available).length})
+                        Local Models ({allModels.filter((m) => m.available).length})
                       </h3>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        GGUF files hosted in your laptop&apos;s models directory
+                        Available through your gateway server
                       </p>
                     </div>
                     <button
@@ -1073,12 +1062,12 @@ export const SettingsPage: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="p-4 sm:p-5 space-y-2" style={{ borderColor: 'var(--border)' }}>
+                  <div className="p-3 sm:p-4 space-y-2" style={{ borderColor: 'var(--border)' }}>
                     {allModels.filter((m) => m.available).length === 0 ? (
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <p className="text-xs py-2" style={{ color: 'var(--text-muted)' }}>
                         {laptopStatus === 'offline'
-                          ? 'Connect to your gateway to view installed models.'
-                          : 'No .gguf files currently loaded. Add GGUF models into your gateway models/ folder.'}
+                          ? 'Connect to gateway to view installed models.'
+                          : 'No .gguf files loaded. Add GGUF models into gateway models/ folder.'}
                       </p>
                     ) : (
                       allModels
