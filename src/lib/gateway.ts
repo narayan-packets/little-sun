@@ -187,31 +187,34 @@ export async function checkGatewayHealth(): Promise<boolean> {
 
   // 1. If we already locked onto a working endpoint, verify it first
   if (activeDirectBaseUrl) {
-    const stillOk = await pingHealthEndpoint(activeDirectBaseUrl, 3000);
+    const stillOk = await pingHealthEndpoint(activeDirectBaseUrl, 4500);
     if (stillOk) return true;
   }
+
+  const isLocalHost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   const proxyUrl =
     typeof window !== 'undefined' ? `${window.location.origin}/gateway-proxy` : '/gateway-proxy';
   const directUrl = getDirectGatewayUrl();
   const localLoopback = 'http://127.0.0.1:8790';
 
-  const candidates = Array.from(
-    new Set([localLoopback, directUrl, proxyUrl].filter(Boolean))
-  );
-
-  // Probe local loopback first (fast 1.2s check when running on the laptop itself)
-  if (await pingHealthEndpoint(localLoopback, 1200)) {
+  // Probe local loopback only on localhost / desktop
+  if (isLocalHost && (await pingHealthEndpoint(localLoopback, 1500))) {
     activeDirectBaseUrl = localLoopback;
     return true;
   }
 
-  // Otherwise race direct Funnel URL and server proxy concurrently with independent controllers
-  const remaining = candidates.filter((c) => c !== localLoopback);
+  // On remote/mobile, probe direct Funnel URL and server proxy concurrently with 6s timeout for cellular networks
+  const candidates = Array.from(
+    new Set([directUrl, proxyUrl, isLocalHost ? localLoopback : ''].filter(Boolean))
+  );
+
   const results = await Promise.all(
-    remaining.map(async (url) => ({
+    candidates.map(async (url) => ({
       url,
-      ok: await pingHealthEndpoint(url, 4000),
+      ok: await pingHealthEndpoint(url, 6000),
     }))
   );
 

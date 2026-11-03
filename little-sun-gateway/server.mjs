@@ -506,7 +506,7 @@ const server = http.createServer(async (req, res) => {
 
       const dynamicSystemPrompt = [
         modelCfg.systemPrompt,
-        `Temporal Context: Today is ${dateStr}. Current local time is ${timeStr}.`,
+        `Current Date & Time: Today is ${dateStr}. Current local time is ${timeStr}. When asked about today's date, day of the week, month, year, or time, answer directly and confidently using this information without stating your knowledge cutoff.`,
       ].join('\n\n');
 
       const upstreamMessages = [

@@ -10,11 +10,18 @@ export interface WebSearchResult {
  */
 export function isTemporalQuery(query: string): boolean {
   const q = query.toLowerCase().trim();
+  if (
+    /\b(today('?s)?|now|current|tonight|this year|this month|this week)\b/i.test(q) &&
+    /\b(date|day|time|year|month|hour|minute|clock)\b/i.test(q)
+  ) {
+    return true;
+  }
   return (
     /\b(what('?s| is) (the )?(current )?(date|time|day|year|month))\b/i.test(q) ||
     /\bwhat time is (it|now)\b/i.test(q) ||
-    /\b(today('?s)? date|current (date|time|year)|what day is (it|today))\b/i.test(q) ||
-    /\b(date of today|date today|time right now|current time)\b/i.test(q)
+    /\bwhat day is (it|today)\b/i.test(q) ||
+    /\b(today('?s)? date|current (date|time|year)|date of today|date today|time right now|current time)\b/i.test(q) ||
+    /\b(what is today|what date is it|what day is today)\b/i.test(q)
   );
 }
 
@@ -30,12 +37,15 @@ export function extractSearchQuery(text: string): string {
     .split('\n')[0]
     .trim();
 
-  // Strip conversational greetings & fillers from beginning
-  q = q.replace(
-    /^(?:hello|hi|hey|good\s+(?:morning|afternoon|evening)|nice to meet you|nice to meet with you|umm+|uh+|please|can you tell me|tell me|could you)\s*[,.!?:]*\s*/i,
-    ''
-  );
-  q = q.replace(/^(?:hello|hi|hey|nice to meet with you|umm+|uh+)\s*[,.!?:]*\s*/i, '');
+  // Strip conversational greetings & fillers repeatedly from beginning
+  let prev = '';
+  while (prev !== q) {
+    prev = q;
+    q = q.replace(
+      /^(?:hello|hi|hey|good\s+(?:morning|afternoon|evening|day)|nice to meet you|nice to meet with you|greetings|umm+|uh+|please|can you tell me|tell me|could you tell me|do you know)\s*[,.!?:]*\s*/i,
+      ''
+    );
+  }
 
   return q.slice(0, 80).trim();
 }

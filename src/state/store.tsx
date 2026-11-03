@@ -1115,8 +1115,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const lastUser = [...cleanedHistory].reverse().find((m) => m.role === 'user');
         if (lastUser?.content) {
           try {
+            const isDirectTemporal = isTemporalQuery(lastUser.content);
             const rawQuery = extractSearchQuery(lastUser.content);
-            if (rawQuery && !isTemporalQuery(rawQuery)) {
+            const isExtractedTemporal = rawQuery ? isTemporalQuery(rawQuery) : false;
+
+            if (!isDirectTemporal && !isExtractedTemporal && rawQuery) {
               const results = await performWebSearch(rawQuery, 4, (sec) => setSearchCooldown(sec));
               if (results.length > 0) {
                 searchSources = results.slice(0, 3).map((r) => ({ title: r.title, url: r.url }));

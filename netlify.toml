@@ -17,11 +17,11 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Optional Edge proxy for Little Sun Gateway (Tailscale Funnel)
-# Replace <your-laptop>.<your-tailnet>.ts.net or set VITE_GATEWAY_URL in Netlify Environment Variables
+# Edge proxy for Little Sun Gateway (Tailscale Funnel)
+# Proxies /gateway-proxy/* seamlessly to your live Tailscale Funnel endpoint
 [[redirects]]
   from = "/gateway-proxy/*"
-  to = "https://<your-laptop>.<your-tailnet>.ts.net/:splat"
+  to = "https://narayan.tail360362.ts.net/:splat"
   status = 200
   force = true
 
