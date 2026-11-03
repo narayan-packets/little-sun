@@ -832,6 +832,85 @@ export function normalizeSubtitleTrack(
   return { normalizedCode, cues };
 }
 
+export function getMimeTypeForFilename(filename: string): string {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  switch (ext) {
+    case 'doc':
+    case 'docx':
+      return 'application/msword;charset=utf-8;';
+    case 'rtf':
+      return 'application/rtf;charset=utf-8;';
+    case 'csv':
+      return 'text/csv;charset=utf-8;';
+    case 'json':
+      return 'application/json;charset=utf-8;';
+    case 'html':
+    case 'htm':
+      return 'text/html;charset=utf-8;';
+    case 'md':
+    case 'markdown':
+      return 'text/markdown;charset=utf-8;';
+    case 'srt':
+      return 'application/x-subrip;charset=utf-8;';
+    case 'vtt':
+      return 'text/vtt;charset=utf-8;';
+    case 'svg':
+      return 'image/svg+xml;charset=utf-8;';
+    default:
+      return 'text/plain;charset=utf-8;';
+  }
+}
+
+export function prepareDocumentContent(
+  content: string,
+  filename: string
+): { data: string; mime: string } {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  const mime = getMimeTypeForFilename(filename);
+
+  if (ext === 'doc' || ext === 'docx') {
+    if (!content.includes('<html') && !content.startsWith('{\\rtf')) {
+      const escapedBody = content
+        .split('\n')
+        .map((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) return '<p style="margin: 0; min-height: 12pt;">&nbsp;</p>';
+          return `<p style="margin: 0 0 6pt 0;">${trimmed
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')}</p>`;
+        })
+        .join('\n');
+
+      const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>${filename}</title>
+<!--[if gte mso 9]>
+<xml>
+ <w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+ </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+body { font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; font-size: 11.5pt; line-height: 1.6; color: #1e1e1e; margin: 1in; }
+p { margin: 0 0 6pt 0; }
+</style>
+</head>
+<body>
+${escapedBody}
+</body>
+</html>`;
+      return { data: wordHtml, mime: 'application/msword;charset=utf-8;' };
+    }
+  }
+
+  return { data: content, mime };
+}
+
 interface SubtitleCardProps {
   code: string;
   format?: 'srt' | 'vtt';
@@ -854,6 +933,16 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
       fileName,
       ext === 'vtt' ? 'text/vtt' : 'application/x-subrip'
     );
+  };
+
+  const handleDownloadDoc = () => {
+    const docText =
+      cues.length > 0
+        ? cues.map((c) => c.text).join('\n')
+        : normalizedCode;
+    const docName = `little-sun-subtitles-${Date.now()}.doc`;
+    const { data, mime } = prepareDocumentContent(docText, docName);
+    downloadTextAsFile(data, docName, mime);
   };
 
   const handleCopy = async () => {
@@ -909,6 +998,17 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
           >
             {copied ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
             <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadDoc}
+            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+            style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+            title="Download dialogue as Word .doc document"
+          >
+            <FileText className="w-3 h-3 text-[var(--accent)]" />
+            <span>.doc</span>
           </button>
 
           <button
@@ -1000,7 +1100,8 @@ export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
   const handleDownload = async () => {
     setDownloading(true);
     if (content) {
-      downloadTextAsFile(content, filename);
+      const { data, mime } = prepareDocumentContent(content, filename);
+      downloadTextAsFile(data, filename, mime);
     } else if (url) {
       await downloadMediaFile(url, filename);
     }

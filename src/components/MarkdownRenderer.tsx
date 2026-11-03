@@ -101,6 +101,34 @@ const SUBTITLE_LANGS = new Set([
   'captions',
 ]);
 
+const DOC_FILE_LANGS = new Set([
+  'doc',
+  'docx',
+  'document',
+  'rtf',
+  'csv',
+  'xlsx',
+  'xls',
+]);
+
+function parseFileDownloadCard(lang: string, code: string) {
+  const normalized = (lang || '').toLowerCase().trim();
+  if (
+    normalized.startsWith('file:') ||
+    normalized.startsWith('filename:') ||
+    normalized.startsWith('file=') ||
+    normalized.startsWith('filename=')
+  ) {
+    const fname = normalized.replace(/^(?:file|filename)[:=]/i, '').trim() || 'document.txt';
+    return <FileDownloadCard filename={fname} content={code} />;
+  }
+  if (DOC_FILE_LANGS.has(normalized)) {
+    const ext = normalized === 'document' ? 'doc' : normalized;
+    return <FileDownloadCard filename={`document.${ext}`} content={code} />;
+  }
+  return null;
+}
+
 function looksLikeVtt(code: string): boolean {
   const t = code.trim();
   return /^WEBVTT\b/i.test(t) || /^\d{2}:\d{2}:\d{2}\.\d{3}\s*-->/m.test(t);
@@ -1033,9 +1061,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
               const isVtt = language === 'vtt' || looksLikeVtt(rawCode);
               return <SubtitleCard code={rawCode} format={isVtt ? 'vtt' : 'srt'} />;
             }
-            if (language.startsWith('file:') || language.startsWith('filename:')) {
-              const fname = language.split(':').slice(1).join(':').trim() || 'document.txt';
-              return <FileDownloadCard filename={fname} content={rawCode} />;
+            const fileCard = parseFileDownloadCard(language, rawCode);
+            if (fileCard) {
+              return fileCard;
             }
 
             return (
@@ -1079,9 +1107,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
               const isVtt = language === 'vtt' || looksLikeVtt(cleanCode);
               return <SubtitleCard code={cleanCode} format={isVtt ? 'vtt' : 'srt'} />;
             }
-            if (language.startsWith('file:') || language.startsWith('filename:')) {
-              const fname = language.split(':').slice(1).join(':').trim() || 'document.txt';
-              return <FileDownloadCard filename={fname} content={cleanCode} />;
+            const fileCard = parseFileDownloadCard(language, cleanCode);
+            if (fileCard) {
+              return fileCard;
             }
             return (
               <CodeBlock
