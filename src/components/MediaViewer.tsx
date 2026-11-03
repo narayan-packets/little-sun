@@ -861,10 +861,29 @@ export function getMimeTypeForFilename(filename: string): string {
   }
 }
 
+/**
+ * Normalizes filenames by excluding impossible binary file formats:
+ * - .docx cannot be generated as raw text; convert to .doc (which opens natively and cleanly in Word without corruption)
+ * - .xlsx/.xls cannot be generated as raw text; convert to .csv (which opens natively in Excel)
+ * - .pptx cannot be generated as raw text; convert to .doc
+ * - .pdf cannot be generated as raw text; convert to .doc
+ */
+export function normalizeDownloadFilename(filename: string): string {
+  if (!filename) return 'document.txt';
+  let clean = filename.trim();
+  clean = clean
+    .replace(/\.docx$/i, '.doc')
+    .replace(/\.xlsx?$/i, '.csv')
+    .replace(/\.pptx?$/i, '.doc')
+    .replace(/\.pdf$/i, '.doc');
+  return clean;
+}
+
 export function prepareDocumentContent(
   content: string,
-  filename: string
+  rawFilename: string
 ): { data: string; mime: string } {
+  const filename = normalizeDownloadFilename(rawFilename);
   const ext = (filename.split('.').pop() || '').toLowerCase();
   const mime = getMimeTypeForFilename(filename);
 
@@ -1178,7 +1197,7 @@ interface FileDownloadCardProps {
 }
 
 export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
-  filename,
+  filename: rawFilename,
   url,
   content,
   fileType,
@@ -1187,6 +1206,7 @@ export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
+  const filename = useMemo(() => normalizeDownloadFilename(rawFilename), [rawFilename]);
   const ext = (fileType || filename.split('.').pop() || 'file').toLowerCase();
   const hasContent = typeof content === 'string' && content.length > 0;
   const contentBytes = hasContent ? new Blob([content]).size : 0;

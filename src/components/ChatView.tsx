@@ -5,7 +5,6 @@ import {
   BookOpen,
   Calculator,
   Code2,
-  Film,
   Menu,
   PanelLeft,
   PenLine,
@@ -25,7 +24,6 @@ const SUGGESTION_PILLS = [
   { label: 'Learn', icon: BookOpen, prompt: 'Explain ' },
   { label: 'Code', icon: Code2, prompt: 'Write a program to ' },
   { label: 'Solve Math', icon: Calculator, prompt: 'Can you solve this math problem step-by-step with LaTeX: ' },
-  { label: 'Media Demo', icon: Film, prompt: 'Preview media generated interface with image and video placeholders' },
 ];
 
 function getHeroGreeting(name: string): string {
@@ -300,8 +298,8 @@ export const ChatView: React.FC = () => {
                 <Composer isHero />
               </div>
 
-              {/* Starter Suggestion Pills (Claude style with icons) */}
-              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-[620px]">
+              {/* Starter Suggestion Pills (balanced & centered) */}
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 max-w-[560px] mx-auto">
                 {SUGGESTION_PILLS.map((item) => {
                   const IconComponent = item.icon;
                   return (

@@ -21,6 +21,7 @@ import {
   downloadTextAsFile,
   FileDownloadCard,
   ImageCard,
+  normalizeDownloadFilename,
   SubtitleCard,
   SvgCard,
   VideoCard,
@@ -105,7 +106,6 @@ const SUBTITLE_LANGS = new Set([
 
 const DOC_FILE_LANGS = new Set([
   'doc',
-  'docx',
   'document',
   'md',
   'markdown',
@@ -114,8 +114,6 @@ const DOC_FILE_LANGS = new Set([
   'rtf',
   'csv',
   'tsv',
-  'xlsx',
-  'xls',
   'jsonfile',
   'htmlfile',
 ]);
@@ -130,7 +128,8 @@ function parseFileDownloadCard(lang: string, code: string) {
     normalized.startsWith('export:') ||
     normalized.startsWith('export=')
   ) {
-    const fname = normalized.replace(/^(?:file|filename|export)[:=]/i, '').trim() || 'document.txt';
+    const rawFname = normalized.replace(/^(?:file|filename|export)[:=]/i, '').trim() || 'document.txt';
+    const fname = normalizeDownloadFilename(rawFname);
     return <FileDownloadCard filename={fname} content={code} />;
   }
   if (DOC_FILE_LANGS.has(normalized)) {
