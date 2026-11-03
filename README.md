@@ -1,76 +1,84 @@
-# Little Sun ☀️ (v1.5)
+# Little Sun ☀️ (v1.7)
 
-> **A warm, private, editorial intelligence interface connecting to your personal local LLM and neural voice engine.**
+> **A warm, private, editorial intelligence interface connecting to your personal local LLM, neural voice engine, and hybrid cloud providers.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version: 1.5.0](https://img.shields.io/badge/Version-1.5.0-orange.svg)]()
+[![Version: 1.7.0](https://img.shields.io/badge/Version-1.7.0-orange.svg)]()
 [![React 19](https://img.shields.io/badge/React-19.0-blue.svg)](https://react.dev/)
 [![Tailwind CSS 4](https://img.shields.io/badge/Tailwind-4.x-38bdf8.svg)](https://tailwindcss.com/)
-[![Vite](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vitejs.dev/)
+[![Vite 8](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vitejs.dev/)
+[![Local LLMs](https://img.shields.io/badge/Inference-llama.cpp_GGUF-emerald.svg)](https://github.com/ggerganov/llama.cpp)
 [![Tailscale](https://img.shields.io/badge/Network-Tailscale_Funnel-blue.svg)](https://tailscale.com/)
 
 ---
 
 ## Overview
 
-**Little Sun** pairs an elegant, distraction-free web client with your own laptop's local inference gateway (`little-sun-gateway`). Powered by [`llama.cpp`](https://github.com/ggerganov/llama.cpp) for offline GGUF intelligence and [`piper-tts`](https://github.com/rhasspy/piper) for natural neural voice streaming, your conversations, prompts, and model weights remain completely under your sovereign control.
+**Little Sun** pairs an elegant, distraction-free web client with your own laptop's local inference gateway (`little-sun-gateway`). Powered by [`llama.cpp`](https://github.com/ggerganov/llama.cpp) for sovereign GGUF intelligence and [`piper-tts`](https://github.com/rhasspy/piper) for natural neural voice streaming, your conversations, prompts, and model weights remain completely under your control.
 
-With **Supabase Auth & Realtime**, your chats, history, and voice preferences synchronize instantaneously across all your devices—desktop, laptop, tablet, and mobile. Out of the box, it also provides an offline preview mode requiring zero external accounts.
+In **V1.7**, Little Sun introduces **Hybrid Intelligence**: seamless toggling between private Local Hardware LLMs and Cloud API Providers (OpenRouter, Groq, xAI Groq, Hugging Face, OpenAI, or any custom OpenAI-compatible endpoint). It also adds **Zero-API-Key Live Web Search**, **Ephemeral Document & Image Uploads with 1-hour expiration**, and an **editorial, balanced composer** optimized for desktop and mobile.
 
 ---
 
 ## Architecture
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                       Web Client (React)                        │
-│   • Editorial typography, dark & light warm solar themes        │
-│   • KaTeX & Interactive 2D function visualizers (vertex, roots) │
-│   • Real-time token streaming with animated solar state emblem  │
-│   • Full multi-device sync, /account & /voices controls         │
-└───────────────┬─────────────────────────────────┬───────────────┘
-                │                                 │
-    Supabase Auth & Realtime             Tailscale Funnel (HTTPS)
-    (Chats, Messages, Preferences)       (SSE Stream, Piper TTS, Slots)
-                │                                 │
-                ▼                                 ▼
-┌───────────────────────────────┐ ┌───────────────────────────────┐
-│       Supabase Postgres       │ │      little-sun-gateway       │
-│   • Row-Level Security (RLS)  │ │   • Node.js gateway (Port 8790)│
-│   • Realtime publication sync │ │   • llama-server (GGUF slot)  │
-│   • Private user auth         │ │   • Piper neural voice engine │
-└───────────────────────────────┘ └───────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                          Web Client (React 19)                         │
+│   • Editorial typography, dark & light warm solar palettes             │
+│   • Symmetrical composer with 3-dot options menu & multi-line expansion│
+│   • KaTeX, interactive 2D function visualizer, & multimodal players    │
+│   • Zero-API-Key Live Web Search (DuckDuckGo, Wikipedia, Algolia)      │
+│   • Ephemeral attachment upload (<30 MB) with 1-hour auto-expiration   │
+└───────────────┬───────────────────┬────────────────────┬───────────────┘
+                │                   │                    │
+    Supabase Auth & Realtime        │          Tailscale Funnel (HTTPS)
+    (Chats, Messages, Uploads)      │          (Local GGUF, Piper TTS)
+                │                   │                    │
+                ▼                   ▼                    ▼
+┌───────────────────────────────┐ ┌───────────────┐ ┌────────────────────┐
+│       Supabase Postgres       │ │ Cloud LLM API │ │ little-sun-gateway │
+│   • Row-Level Security (RLS)  │ │ • OpenRouter  │ │ • Node.js (8790)   │
+│   • Realtime publication sync │ │ • Groq / xAI  │ │ • llama-server GGUF│
+│   • 'chat-uploads' 1-hr TTL   │ │ • Hugging Face│ │ • Piper TTS engine │
+│   • Private user auth         │ │ • OpenAI / OAI│ │ • Temporal context │
+└───────────────────────────────┘ └───────────────┘ └────────────────────┘
 ```
 
 ---
 
-## Highlights in V1.5
+## Highlights in V1.7
 
-- ✍️ **Editorial Claude-Inspired Hero**:
-  - Time-aware greeting (`Morning`, `Afternoon`, `Evening`) in classic serif typography.
-  - Centered hero composer with starter suggestion pills (`Write`, `Learn`, `Code`, `Solve Math`).
-  - Seamless, jitter-free transition between empty state and active chat conversation.
+- 🌐 **Zero-API-Key Multi-Engine Web Search**:
+  - Live search without requiring API keys or subscriptions.
+  - Aggregates DuckDuckGo Instant Answers, Wikipedia REST API, and Algolia Live API.
+  - **Temporal Context Routing**: Inquiring about current date/time bypasses irrelevant search queries and provides exact local time and date.
+  - **Sliding-Window Rate Limiting**: Client-side throttle (max 8 req/min) with cooldown countdown badge to protect upstream endpoints.
+  - **Privacy Favicon Sources**: Responsive source cards with DuckDuckGo favicons, page titles, and external link dialogs.
 
-- ☀️ **The Luminous Solar Cursor & Model Waking State**:
-  - Dedicated visual indicator pill displaying real-time engine states (*"Waking model…"* or *"Thinking…"*).
-  - Trailing breathing solar ember dot (`.solar-cursor`) with GPU-accelerated pulse animation during streaming.
+- 📎 **Ephemeral File & Document Uploads (1-Hour Auto-Expiration)**:
+  - Drag-and-drop or select images (PNG, JPEG, WebP, GIF) and text documents (TXT, MD, CSV, JSON, LOG, Code).
+  - Storage files automatically expire after 1 hour (`TTL = 3600s`) to save storage space and preserve privacy.
+  - Context guardrails: Text files are safely truncated to protect context limits.
+  - Modality awareness: Vision feedback warns if an active model is text-only.
 
-- 🖥️ **Mac-Style Terminal Code Blocks**:
-  - Three-dot macOS window controls with instant one-click copy, syntax highlighting, and mobile line wrapping.
+- ✍️ **Balanced & Responsive Composer**:
+  - Symmetrical geometry: The three-dot (`···`) options menu and Send button share identical baseline, height, and visual weight.
+  - Dynamic expansion: Starts as a sleek, single-line pill when empty and smoothly anchors to the bottom row when typing multi-line text.
+  - Clean options popover: Quick access to Attach File and Web Search toggle.
 
-- 🎙️ **Living Audio Waveform**:
-  - Real-time 3-bar animated acoustic soundwave indicator when Pocket TTS is reading aloud.
+- 🎬 **Rich Multimodal Players**:
+  - **Image Viewer**: Auto-adjustable aspect ratio viewport, tap-to-expand fullscreen lightbox, and 1-click download.
+  - **Inline Video Player**: Fluid inline playback with native controls and download action.
+  - **Living Audio Player**: Real-time animated waveforms for TTS and audio generation models.
+  - **SVG Vector Graphics**: Live render and code view toggle with SVG export.
 
-- ⌨️ **Fluid Keyboard Navigation**:
-  - Global shortcut modal (`?` or `Ctrl + /`).
-  - Instant new chat (`Ctrl + K` or `Ctrl + Shift + O`).
-  - Desktop auto-focus on new chat with mobile on-screen keyboard protection.
+- 🕒 **Dynamic Temporal Context**:
+  - System prompts on the local gateway dynamically inject current day, date, and local time so local LLMs always know the real-time calendar without external API calls.
 
-- 📱 **Mobile Zero-Cache & Ergonomics (V1.5)**:
-  - Instant zero-cache headers (`Cache-Control: no-cache, no-store, must-revalidate`) preventing stale mobile browser snapshots.
-  - Auto-purge script clearing old browser CacheStorage and unregistering stale workers.
-  - Scroll-resilient hero container with iOS WebKit touch-focus protection.
-  - Full Progressive Web App (PWA) manifest support.
+- ☁️ **Multi-Provider Cloud API Integration**:
+  - Connect your own API keys directly in Settings for OpenRouter, Groq, xAI Groq, Hugging Face, OpenAI, or custom endpoints.
+  - Per-device encrypted browser storage (keys never leave your browser).
 
 ---
 
@@ -83,7 +91,7 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
 
 - **🔒 Zero Model & Data Leakage**:
   - Raw GGUF model file names, quantization formats, and local filesystem paths stay strictly on your hardware.
-  - Web clients interact with clean, customizable aliases (e.g., `Sun Core`, `Sun Fast`).
+  - Web clients interact with clean, customizable aliases (e.g., `Sun Light`, `Sun Core`, `Sun Ultra`).
 
 - **⚡ Per-Chat Memory & Slot Isolation**:
   - Switching or creating chats automatically sleeps or evicts inactive KV cache slots on your laptop to minimize VRAM/RAM consumption.
@@ -93,9 +101,6 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
   - High-fidelity neural voice synthesis streamed directly from your local hardware via `piper-tts`.
   - Instant browser-native Web Speech fallback for offline or zero-latency mobile listening.
 
-- **📱 Seamless Cross-Device Sync**:
-  - Instant database-level sync across phone, tablet, and desktop using Supabase PostgreSQL with strict Row-Level Security (RLS).
-
 ---
 
 ## Project Structure
@@ -103,21 +108,23 @@ With **Supabase Auth & Realtime**, your chats, history, and voice preferences sy
 ```text
 little-sun/
 ├── src/                          # Frontend React SPA
-│   ├── components/               # UI components (MathVisualizer, ChatView, Composer, etc.)
-│   ├── lib/                      # Core utilities (gateway client, Supabase client, TTS, tokens)
+│   ├── components/               # UI components (Composer, ChatView, MediaViewer, etc.)
+│   ├── lib/                      # Core modules (webSearch, cloudApi, modality, supabase)
 │   ├── pages/                    # Chat, Login, and Settings views
 │   ├── state/                    # Global state & conversation store
 │   └── styles/                   # Solar theme tokens and Tailwind CSS
 ├── little-sun-gateway/           # Local Laptop Inference Gateway
 │   ├── models/                   # Local GGUF models directory (gitignored)
 │   ├── bin/                      # llama-server executable (gitignored)
+│   ├── server.mjs                # Express gateway server with temporal injection
 │   ├── llama-manager.mjs         # Process lifecycle & KV slot controller
+│   ├── auth.mjs                  # JWT and local preview auth handler
 │   ├── tts-proxy.mjs             # Piper neural voice proxy
 │   ├── models.json               # Gateway models configuration
 │   ├── download_llama.bat        # Windows one-click llama-server downloader
 │   └── start_little_sun.bat      # Windows one-click gateway & Funnel launcher
 ├── supabase/
-│   └── schema.sql                # Complete Supabase RLS and Realtime schema
+│   └── schema.sql                # Complete Supabase RLS, Realtime, & Storage schema
 ├── server.ts                     # Lightweight production static & proxy server
 ├── vite.config.ts                # Vite build configuration
 └── package.json                  # Root dependencies & scripts
@@ -148,11 +155,11 @@ Set your configuration values:
 VITE_SUPABASE_URL="https://<project-ref>.supabase.co"
 VITE_SUPABASE_ANON_KEY="your-supabase-anon-key"
 
-# Public HTTPS URL of your laptop's Tailscale Funnel
+# Public HTTPS URL of your laptop's Tailscale Funnel (or local gateway)
 VITE_GATEWAY_URL="https://<your-laptop>.<your-tailnet>.ts.net"
 ```
 
-*(Note: If you leave `VITE_SUPABASE_URL` unset, Little Sun automatically operates in Local Offline Preview mode with local storage persistence!)*
+*(Note: If you leave `VITE_SUPABASE_URL` unset, Little Sun automatically operates in Local Offline Preview mode with zero external accounts!)*
 
 #### Run Web Development Server
 ```bash
@@ -167,13 +174,15 @@ npm start
 
 ---
 
-### 2. Supabase Setup (Optional for Multi-Device Sync)
+### 2. Supabase Setup (Multi-Device Sync & Ephemeral Storage)
 
 1. Create a free project at [supabase.com](https://supabase.com).
 2. Open the **SQL Editor**, paste the contents of [`supabase/schema.sql`](./supabase/schema.sql), and click **Run**.
-   - This creates `chats` and `messages` tables, enables Row-Level Security (RLS), adds timestamp triggers, and enables the `supabase_realtime` publication.
+   - Creates `chats` and `messages` tables with Row-Level Security (RLS).
+   - Creates the `chat-uploads` storage bucket with upload & delete policies.
+   - Sets up automatic 1-hour expiration cleanup for uploaded files.
+   - Enables `supabase_realtime` publication for instant cross-device synchronization.
 3. In **Authentication → Providers → Email**, you can optionally disable public signups to keep your instance private and invite-only.
-4. Add your personal email under **Authentication → Users**.
 
 ---
 
@@ -191,7 +200,7 @@ Configure `little-sun-gateway/.env`:
 ```env
 PORT=8790
 SUPABASE_URL=https://<project-ref>.supabase.co
-ALLOWED_ORIGINS=https://<your-app>.netlify.app,https://<your-app>.vercel.app,http://localhost:5173
+ALLOWED_ORIGINS=https://<your-app>.netlify.app,https://<your-app>.vercel.app,http://localhost:3000
 OWNER_EMAIL=you@example.com
 ALLOWED_EMAILS=you@example.com
 PUBLIC_FUNNEL_URL=https://<your-laptop>.<your-tailnet>.ts.net
@@ -220,16 +229,36 @@ IDLE_UNLOAD_SECONDS=60
 Configure your available GGUF models in `little-sun-gateway/models.json`:
 ```json
 {
-  "default": "sun-core",
-  "systemPrompt": "You are Little Sun, a private, calm personal assistant running locally on your user's laptop. Keep answers clear, direct, and thoughtful. When performing calculations, solving math, or analyzing equations, always present mathematical formulas, calculations, and functions in clear LaTeX (use $$...$$ for display equations and $...$ for inline math) so they render with interactive visual graphs and mathematical typesetting.",
+  "default": "sun-light",
+  "systemPrompt": "You are Little Sun, a calm, direct, and thoughtful personal assistant. Answer questions concisely, naturally, and with intellectual clarity. Do not overexplain unless requested.",
   "models": [
+    {
+      "id": "sun-light",
+      "name": "Sun Light",
+      "file": "models/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+      "enabled": true,
+      "contextSize": 16384,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
     {
       "id": "sun-core",
       "name": "Sun Core",
-      "file": "models/my-model-q4.gguf",
+      "file": "models/qwen2.5-3b-instruct-q4_k_m.gguf",
       "enabled": true,
       "contextSize": 16384,
-      "threads": 6,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+    {
+      "id": "sun-ultra",
+      "name": "Sun Ultra",
+      "file": "models/Qwen3-4B-Q4_K_M.gguf",
+      "enabled": true,
+      "contextSize": 16384,
+      "threads": 4,
       "temperature": 0.7,
       "maxTokens": 4096
     }
@@ -241,9 +270,9 @@ Configure your available GGUF models in `little-sun-gateway/models.json`:
 
 ## Deployment
 
-Deploy the frontend anywhere with zero backend lock-in:
+Deploy the frontend anywhere with zero vendor lock-in:
 
-- **Netlify**: Pre-configured with `netlify.toml`. Connect your repository to Netlify and add your environment variables in Site settings.
+- **Netlify**: Pre-configured with `netlify.toml`. Connect your repository and configure environment variables in Site settings.
 - **Vercel**: Pre-configured with `vercel.json` SPA rewrite rules.
 - **Self-Hosted / Docker**: Build static assets with `npm run build` and serve via Node or Nginx.
 

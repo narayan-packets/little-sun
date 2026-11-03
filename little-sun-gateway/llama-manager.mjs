@@ -107,7 +107,7 @@ export class LlamaManager {
 
   readConfig() {
     const defaultSystemPrompt =
-      "You are Little Sun, a private, calm personal assistant running locally on your user's laptop. Keep answers clear, direct, and thoughtful. When performing calculations, solving math, or analyzing equations, always present mathematical formulas, calculations, and functions in clear LaTeX (use $$...$$ for display equations and $...$ for inline math) so they render with interactive visual graphs and mathematical typesetting.";
+      "You are Little Sun, a calm, direct, and thoughtful personal assistant. Answer questions concisely, naturally, and accurately. Do not overexplain, lecture, or add unnecessary preamble or postscripts. When calculations or math are involved, use LaTeX ($$...$$ for display and $...$ for inline math). Speak with natural intelligence.";
 
     let cfg = {
       default: '',
@@ -323,9 +323,8 @@ export class LlamaManager {
 
     const displayName = (typeof found.name === 'string' && found.name.trim()) || 'Little Sun';
     const identityPrompt = [
-      cfg.systemPrompt ||
-        "You are Little Sun, a concise, helpful assistant running locally on your user's laptop.",
-      `Identity rule: Your name is "${displayName}" under Little Sun. Do not mention raw model file names, parameter counts, quantization formats (such as GGUF), or file sizes.`,
+      cfg.systemPrompt || defaultSystemPrompt,
+      `Identity: You are "${displayName}" under Little Sun. Respond with clarity, precision, and natural intelligence without lecturing or overexplaining.`,
     ].join('\n');
 
     return {

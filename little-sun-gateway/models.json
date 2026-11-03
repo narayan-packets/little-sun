@@ -1,5 +1,36 @@
 {
-  "default": "",
-  "systemPrompt": "You are Little Sun, a private, calm personal assistant running locally on your user's laptop. Keep answers clear, direct, and thoughtful. When performing calculations, solving math, or analyzing equations, always present mathematical formulas, calculations, and functions in clear LaTeX (use $$...$$ for display equations and $...$ for inline math) so they render with interactive visual graphs and mathematical typesetting.",
-  "models": []
+  "default": "sun-light",
+  "systemPrompt": "You are Little Sun, a calm, direct, and thoughtful personal assistant. Answer questions concisely, naturally, and accurately. Do not overexplain, lecture, or add unnecessary preamble or postscripts. When calculations or math are involved, use LaTeX ($$...$$ for display and $...$ for inline math). Speak with natural intelligence.",
+  "models": [
+    {
+      "id": "sun-light",
+      "name": "Sun Light",
+      "file": "models/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+      "enabled": true,
+      "contextSize": 16384,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+    {
+      "id": "sun-core",
+      "name": "Sun Core",
+      "file": "models/qwen2.5-3b-instruct-q4_k_m.gguf",
+      "enabled": true,
+      "contextSize": 16384,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+    {
+      "id": "sun-ultra",
+      "name": "Sun Ultra",
+      "file": "models/Qwen3-4B-Q4_K_M.gguf",
+      "enabled": true,
+      "contextSize": 16384,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    }
+  ]
 }

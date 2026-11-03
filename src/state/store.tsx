@@ -26,6 +26,7 @@ import {
   syncUserPreferences,
   touchChatRow,
   type UserSession,
+  generateUUID,
 } from '../lib/supabase';
 import {
   checkGatewayHealth,
@@ -45,14 +46,39 @@ import {
 } from '../lib/tokens';
 import { POCKET_VOICES, type PocketVoiceId, setSavedSpeed, setSavedVoice, ttsController } from '../lib/tts';
 import { isMathPrompt, sanitizeMessageListForMath, stripHallucinatedMath } from '../lib/markdown';
+import {
+  type CloudConfig,
+  type CloudModel,
+  type CloudProviderId,
+  type SavedApiKey,
+  CLOUD_PROVIDERS,
+  MAX_API_KEYS,
+  fetchModelsForApiKey,
+  findKeyForModel,
+  getAllAvailableCloudModels,
+  getSavedCloudConfig,
+  saveCloudConfig,
+  streamCloudChat,
+} from '../lib/cloudApi';
+import {
+  extractSearchQuery,
+  formatSearchResultsForPrompt,
+  getSearchCooldownSeconds,
+  isTemporalQuery,
+  performWebSearch,
+} from '../lib/webSearch';
 
 export type LaptopUiStatus = 'offline' | 'sleeping' | 'waking' | 'ready' | 'busy';
-export type SettingsRouteSection = 'account' | 'voices';
+export type AppMode = 'local' | 'cloud';
+export type SettingsRouteSection = 'account' | 'cloud' | 'voices';
 
 function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | null {
   const clean = pathname.replace(/\/+$/, '').toLowerCase();
   if (clean === '/settings' || clean === '/account' || clean === '/settings/account') {
     return 'account';
+  }
+  if (clean === '/cloud' || clean === '/settings/cloud' || clean === '/api' || clean === '/settings/api') {
+    return 'cloud';
   }
   if (clean === '/voices' || clean === '/settings/voices') {
     return 'voices';
@@ -62,6 +88,7 @@ function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | 
 
 function getPathForSettingsSection(section: SettingsRouteSection): string {
   if (section === 'voices') return '/voices';
+  if (section === 'cloud') return '/cloud';
   return '/account';
 }
 
@@ -168,6 +195,13 @@ interface AppStateContextValue {
   allModels: GatewayModel[];
   selectedModelId: string;
   laptopStatus: LaptopUiStatus;
+  mode: AppMode;
+  setMode: (mode: AppMode) => void;
+  cloudConfig: CloudConfig;
+  addCloudApiKey: (data: { provider: CloudProviderId; apiKey: string; baseUrl?: string }) => Promise<void>;
+  unlinkCloudApiKey: (id: string) => void;
+  refreshCloudApiKeyModels: (id: string) => Promise<void>;
+  cloudStatus: 'ready' | 'generating' | 'error' | 'unconfigured';
   isAccessRestricted: boolean;
   isStreaming: boolean;
   streamingStage: 'idle' | 'loading_model' | 'generating';
@@ -179,6 +213,10 @@ interface AppStateContextValue {
   isSettingsOpen: boolean;
   isShortcutsOpen: boolean;
   settingsSection: SettingsRouteSection;
+  isWebSearchActive: boolean;
+  searchCooldown: number;
+  toggleWebSearch: () => void;
+  setIsWebSearchActive: (val: boolean | ((prev: boolean) => boolean)) => void;
   setIsShortcutsOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setComposerDraft: (text: string) => void;
   setSelectedModelId: (modelId: string) => void;
@@ -193,11 +231,20 @@ interface AppStateContextValue {
   continueInNewChat: () => void;
   renameChat: (chatId: string, newTitle: string) => Promise<void>;
   deleteChat: (chatId: string) => Promise<void>;
-  sendMessage: (contentOverride?: string) => Promise<void>;
+  sendMessage: (contentOverride?: string, attachmentsOverride?: AttachmentItem[]) => Promise<void>;
   stopGenerating: () => void;
   regenerateLastReply: () => Promise<void>;
   clearFailedSendError: () => void;
   refreshGateway: () => Promise<void>;
+}
+
+export interface AttachmentItem {
+  id: string;
+  name: string;
+  size: number;
+  type: 'text' | 'image';
+  dataUrl?: string;
+  textContent?: string;
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
@@ -226,21 +273,146 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
 
+  const [mode, setModeState] = useState<AppMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('littlesun_mode_v1');
+      if (saved === 'cloud' || saved === 'local') return saved;
+    }
+    return 'local';
+  });
+
+  const setMode = useCallback((nextMode: AppMode) => {
+    setModeState(nextMode);
+    try {
+      localStorage.setItem('littlesun_mode_v1', nextMode);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const [cloudConfig, setCloudConfigState] = useState<CloudConfig>(() => getSavedCloudConfig());
+
+  const addCloudApiKey = useCallback(
+    async (data: { provider: CloudProviderId; apiKey: string; baseUrl?: string }) => {
+      if (cloudConfig.keys.length >= MAX_API_KEYS) {
+        throw new Error(`Maximum of ${MAX_API_KEYS} API keys reached. Please unlink an API key first.`);
+      }
+
+      const prov = data.provider;
+      const info = CLOUD_PROVIDERS[prov] || CLOUD_PROVIDERS.openrouter;
+      const baseUrl = data.baseUrl?.trim() || info.defaultBaseUrl;
+
+      // Real-time model fetching using this key!
+      const models = await fetchModelsForApiKey(prov, data.apiKey, baseUrl);
+
+      const newKey: SavedApiKey = {
+        id: generateUUID(),
+        provider: prov,
+        label: info.name,
+        apiKey: data.apiKey.trim(),
+        baseUrl,
+        addedAt: new Date().toISOString(),
+        models,
+      };
+
+      setCloudConfigState((prev) => {
+        const nextKeys = [...prev.keys, newKey];
+        const nextSelected = prev.selectedModelId || models[0]?.id || '';
+        const next = { ...prev, keys: nextKeys, selectedModelId: nextSelected };
+        saveCloudConfig(next);
+        return next;
+      });
+    },
+    [cloudConfig.keys.length]
+  );
+
+  const unlinkCloudApiKey = useCallback((id: string) => {
+    setCloudConfigState((prev) => {
+      const nextKeys = prev.keys.filter((k) => k.id !== id);
+      const remainingModels = getAllAvailableCloudModels({ ...prev, keys: nextKeys });
+      const stillHasSelected = remainingModels.some((m) => m.id === prev.selectedModelId);
+      const nextSelected = stillHasSelected ? prev.selectedModelId : remainingModels[0]?.id || '';
+      const next = { ...prev, keys: nextKeys, selectedModelId: nextSelected };
+      saveCloudConfig(next);
+      return next;
+    });
+  }, []);
+
+  const refreshCloudApiKeyModels = useCallback(async (id: string) => {
+    const targetKey = cloudConfig.keys.find((k) => k.id === id);
+    if (!targetKey) return;
+    const models = await fetchModelsForApiKey(targetKey.provider, targetKey.apiKey, targetKey.baseUrl);
+    setCloudConfigState((prev) => {
+      const nextKeys = prev.keys.map((k) => (k.id === id ? { ...k, models } : k));
+      const next = { ...prev, keys: nextKeys };
+      saveCloudConfig(next);
+      return next;
+    });
+  }, [cloudConfig.keys]);
+
+  const effectiveCloudModels = useMemo<GatewayModel[]>(() => {
+    const rawList = getAllAvailableCloudModels(cloudConfig);
+    return rawList.map((m) => ({
+      id: m.id,
+      name: m.name || m.id,
+      available: true,
+      enabled: true,
+      isDefault: m.id === cloudConfig.selectedModelId,
+      contextSize: m.contextSize || 131072,
+      maxTokens: 4096,
+    }));
+  }, [cloudConfig]);
+
   const [allModels, setAllModels] = useState<GatewayModel[]>([]);
 
   // Listed models (enabled by user)
   const models = useMemo(() => {
+    if (mode === 'cloud') {
+      return effectiveCloudModels;
+    }
     const enabledList = allModels.filter((m) => m.enabled !== false);
     return enabledList.length > 0 ? enabledList : allModels;
-  }, [allModels]);
+  }, [mode, effectiveCloudModels, allModels]);
 
-  const [selectedModelId, setSelectedModelId] = useState<string>('');
+  const [localSelectedModelId, setLocalSelectedModelId] = useState<string>('');
+
+  const selectedModelId = useMemo(() => {
+    if (mode === 'cloud') {
+      return cloudConfig.selectedModelId || effectiveCloudModels[0]?.id || '';
+    }
+    return localSelectedModelId;
+  }, [mode, cloudConfig.selectedModelId, effectiveCloudModels, localSelectedModelId]);
+
+  const setSelectedModelId = useCallback(
+    (id: string) => {
+      if (mode === 'cloud') {
+        setCloudConfigState((prev) => {
+          const next = { ...prev, selectedModelId: id };
+          saveCloudConfig(next);
+          return next;
+        });
+      } else {
+        setLocalSelectedModelId(id);
+      }
+    },
+    [mode]
+  );
 
   const [laptopStatus, setLaptopStatus] = useState<LaptopUiStatus>('sleeping');
   const [isAccessRestricted, setIsAccessRestricted] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingStage, setStreamingStage] = useState<'idle' | 'loading_model' | 'generating'>('idle');
   const [streamingContent, setStreamingContent] = useState('');
+
+  const cloudStatus = useMemo<'ready' | 'generating' | 'error' | 'unconfigured'>(() => {
+    if (cloudConfig.keys.length === 0) {
+      return 'unconfigured';
+    }
+    if (isStreaming && mode === 'cloud') {
+      return 'generating';
+    }
+    return 'ready';
+  }, [cloudConfig.keys.length, isStreaming, mode]);
 
   const [composerDraft, setComposerDraft] = useState('');
   const [failedSend, setFailedSend] = useState<FailedSendState | null>(null);
@@ -259,6 +431,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return false;
   });
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isWebSearchActive, setIsWebSearchActive] = useState<boolean>(false);
+  const [searchCooldown, setSearchCooldown] = useState<number>(() => getSearchCooldownSeconds());
+
+  useEffect(() => {
+    if (searchCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setSearchCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [searchCooldown]);
+
+  const toggleWebSearch = useCallback(() => {
+    setIsWebSearchActive((prev) => !prev);
+  }, []);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const isStreamingRef = useRef(false);
@@ -514,6 +700,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (isSettingsOpen) {
       if (settingsSection === 'voices') {
         document.title = 'Voices · Little Sun';
+      } else if (settingsSection === 'cloud') {
+        document.title = 'Cloud API · Little Sun';
       } else {
         document.title = 'Account · Little Sun';
       }
@@ -563,12 +751,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             pool.find((m) => m.isDefault && m.available) ||
             pool.find((m) => m.available) ||
             pool[0];
-          setSelectedModelId((prev) => {
+          setLocalSelectedModelId((prev) => {
             if (pool.some((m) => m.id === prev && m.available)) return prev;
             return def.id;
           });
         } else {
-          setSelectedModelId('');
+          setLocalSelectedModelId('');
         }
       }
 
@@ -872,10 +1060,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [session, activeChatId, stopGenerating]
   );
 
-  const activeModelMeta = useMemo(
-    () => allModels.find((m) => m.id === selectedModelId) || allModels[0],
-    [allModels, selectedModelId]
-  );
+  const activeModelMeta = useMemo(() => {
+    const activeList = mode === 'cloud' ? effectiveCloudModels : allModels;
+    return activeList.find((m) => m.id === selectedModelId) || activeList[0];
+  }, [mode, effectiveCloudModels, allModels, selectedModelId]);
 
   const contextUsage = useMemo<ChatContextUsage>(() => {
     const effectiveHistory = isStreaming && streamingContent
@@ -893,19 +1081,63 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     async (chatId: string, historyForContext: MessageRow[], modelId: string) => {
       if (!session) return;
 
-      const modelMeta = allModels.find((m) => m.id === modelId);
+      const activeList = mode === 'cloud' ? effectiveCloudModels : allModels;
+      const modelMeta = activeList.find((m) => m.id === modelId) || activeList[0];
       const cleanedHistory = sanitizeMessageListForMath(
         historyForContext.map((m) => ({ role: m.role, content: m.content }))
       );
-      const lastUserContent =
-        [...cleanedHistory].reverse().find((m) => m.role === 'user')?.content || '';
-      const allowMath = isMathPrompt(lastUserContent);
 
       const trimmedPayload = trimMessagesForContext(
         cleanedHistory,
         modelMeta?.contextSize || 16384,
         modelMeta?.maxTokens || 4096
       );
+
+      // Generate current real-time temporal string
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      const timeStr = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      const temporalContext = `Temporal Context: Today is ${dateStr}. Current local time is ${timeStr}.`;
+
+      // Perform free live web search if enabled (strictly for Local LLMs to protect Cloud context limits)
+      let liveWebContext = '';
+      let searchSources: Array<{ title: string; url: string }> = [];
+      if (mode === 'local' && isWebSearchActive) {
+        const lastUser = [...cleanedHistory].reverse().find((m) => m.role === 'user');
+        if (lastUser?.content) {
+          try {
+            const rawQuery = extractSearchQuery(lastUser.content);
+            if (rawQuery && !isTemporalQuery(rawQuery)) {
+              const results = await performWebSearch(rawQuery, 4, (sec) => setSearchCooldown(sec));
+              if (results.length > 0) {
+                searchSources = results.slice(0, 3).map((r) => ({ title: r.title, url: r.url }));
+                liveWebContext = formatSearchResultsForPrompt(rawQuery, results);
+              }
+            }
+          } catch {
+            // ignore web search errors
+          }
+        }
+      }
+
+      const contextualPayload = trimmedPayload.map((m, idx) => {
+        if (idx === trimmedPayload.length - 1 && m.role === 'user' && liveWebContext) {
+          return {
+            ...m,
+            content: `${m.content}${liveWebContext}`,
+          };
+        }
+        return m;
+      });
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -915,37 +1147,74 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setStreamingContent('');
 
       let rawAccumulated = '';
-      let accumulated = '';
       let streamError: string | null = null;
 
       try {
-        await streamGatewayChat({
-          accessToken: session.accessToken,
-          chatId,
-          model: modelId,
-          messages: trimmedPayload,
-          signal: controller.signal,
-          onEvent: (evt) => {
-            if (evt.type === 'status') {
-              if (evt.state === 'loading_model') {
-                setStreamingStage('loading_model');
-                setLaptopStatus('waking');
-              } else if (evt.state === 'generating') {
+        if (mode === 'cloud') {
+          const effectiveModel = modelId || cloudConfig.selectedModelId || 'default';
+          const targetKey = findKeyForModel(cloudConfig, effectiveModel);
+          if (!targetKey) {
+            throw new Error('No API key linked for this model. Please link an API key in Settings > Cloud API.');
+          }
+          const baseSystemPrompt =
+            `You are Little Sun, a calm, direct, and thoughtful AI assistant. Answer questions concisely, naturally, and accurately. When calculations, math, or equations are involved, use LaTeX ($$...$$ or $...$). When generating images or videos, provide markdown image/video links. When generating vector graphics, output clean SVG in \`\`\`svg blocks. When generating subtitles, output valid timestamps in \`\`\`srt or \`\`\`vtt blocks.\n\n${temporalContext}`;
+          const fullSystemPrompt = baseSystemPrompt;
+
+          await streamCloudChat({
+            key: targetKey,
+            modelId: effectiveModel,
+            webSearch: false,
+            messages: [
+              {
+                role: 'system',
+                content: fullSystemPrompt,
+              },
+              ...contextualPayload.map((m) => ({
+                role: m.role as 'user' | 'assistant' | 'system',
+                content: m.content,
+              })),
+            ],
+            signal: controller.signal,
+            onStatus: () => {
+              setStreamingStage('generating');
+            },
+            onToken: (tok) => {
+              rawAccumulated += tok;
+              setStreamingContent(rawAccumulated);
+            },
+          });
+        } else {
+          await streamGatewayChat({
+            accessToken: session.accessToken,
+            chatId,
+            model: modelId,
+            messages: contextualPayload,
+            signal: controller.signal,
+            onEvent: (evt) => {
+              if (evt.type === 'status') {
+                if (evt.state === 'loading_model') {
+                  setStreamingStage('loading_model');
+                  setLaptopStatus('waking');
+                } else if (evt.state === 'generating') {
+                  setStreamingStage('generating');
+                  setLaptopStatus('ready');
+                }
+              } else if (evt.type === 'token') {
                 setStreamingStage('generating');
                 setLaptopStatus('ready');
+                rawAccumulated += evt.text;
+                setStreamingContent(rawAccumulated);
+              } else if (evt.type === 'error') {
+                streamError = evt.message || 'Generation failed.';
               }
-            } else if (evt.type === 'token') {
-              setStreamingStage('generating');
-              setLaptopStatus('ready');
-              rawAccumulated += evt.text;
-              setStreamingContent(rawAccumulated);
-            } else if (evt.type === 'error') {
-              streamError = evt.message || 'Generation failed.';
-            }
-          },
-        });
+            },
+          });
+        }
 
-        const finalClean = rawAccumulated.trim();
+        let finalClean = rawAccumulated.trim();
+        if (searchSources.length > 0 && !finalClean.includes('### Sources')) {
+          finalClean += `\n\n### Sources\n${searchSources.map((s) => `- [${s.title}](${s.url})`).join('\n')}`;
+        }
         const finalStatus = streamError ? 'error' : 'complete';
         const finalText =
           finalClean || (streamError ? `Error: ${streamError}` : '');
@@ -972,7 +1241,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             )
           );
         }
-        setLaptopStatus('ready');
+        if (mode === 'local') {
+          setLaptopStatus('ready');
+        }
       } catch (err) {
         const isAbort =
           controller.signal.aborted ||
@@ -995,7 +1266,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setStreamingStage('idle');
           setStreamingContent('');
           setMessages((prev) => [...prev, savedStopped]);
-          setLaptopStatus('ready');
+          if (mode === 'local') setLaptopStatus('ready');
         } else if (err instanceof GatewayForbiddenError) {
           setIsAccessRestricted(true);
         } else if (err instanceof GatewayBusyError) {
@@ -1026,7 +1297,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               error: message,
             }));
           }
-          pollGateway();
+          if (mode === 'local') pollGateway();
         }
       } finally {
         isStreamingRef.current = false;
@@ -1036,14 +1307,16 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setStreamingContent('');
       }
     },
-    [session, allModels, pollGateway]
+    [session, mode, effectiveCloudModels, allModels, cloudConfig, pollGateway, isWebSearchActive]
   );
 
   const sendMessage = useCallback(
-    async (contentOverride?: string) => {
+    async (contentOverride?: string, attachmentsOverride?: AttachmentItem[]) => {
       if (!session || isStreamingRef.current || isAccessRestricted) return;
       const rawText = (contentOverride !== undefined ? contentOverride : composerDraft).trim();
-      if (!rawText) return;
+      const attachments = attachmentsOverride || [];
+
+      if (!rawText && attachments.length === 0) return;
 
       const checkUsage = computeChatContextUsage(
         messages,
@@ -1056,23 +1329,61 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return;
       }
 
-      if (laptopStatus === 'offline') {
-        setFailedSend({
-          text: rawText,
-          error: 'Service is currently offline. Please try again in a moment.',
-        });
-        return;
+      const isMediaDemo =
+        /media demo|preview media|image.*placeholder|video.*placeholder/i.test(rawText);
+
+      if (!isMediaDemo) {
+        if (mode === 'cloud' && cloudConfig.keys.length === 0) {
+          setFailedSend({
+            text: rawText,
+            error: 'Please link an API key in Settings > Cloud API before sending messages.',
+          });
+          return;
+        }
+
+        if (mode === 'local' && laptopStatus === 'offline') {
+          setFailedSend({
+            text: rawText,
+            error: 'Service is currently offline. Please try again in a moment.',
+          });
+          return;
+        }
       }
 
       setFailedSend(null);
       setComposerDraft('');
+
+      let fullUserMessage = rawText;
+      if (attachments.length > 0) {
+        const textParts: string[] = [];
+        if (rawText) textParts.push(rawText);
+
+        const imgAtts = attachments.filter((a) => a.type === 'image');
+        const txtAtts = attachments.filter((a) => a.type === 'text');
+
+        if (imgAtts.length > 0) {
+          const imgMarkdown = imgAtts
+            .map((img) => `![${img.name}](${img.dataUrl || ''})`)
+            .join('\n\n');
+          textParts.push(imgMarkdown);
+        }
+
+        if (txtAtts.length > 0) {
+          const txtMarkdown = txtAtts
+            .map((t) => `**Attached \`${t.name}\`:**\n\`\`\`\n${t.textContent || ''}\n\`\`\``)
+            .join('\n\n');
+          textParts.push(txtMarkdown);
+        }
+
+        fullUserMessage = textParts.join('\n\n');
+      }
 
       let currentChatId = activeChatId;
       let currentMessages = messages;
 
       try {
         if (!currentChatId) {
-          const title = makeChatTitleFromMessage(rawText);
+          const title = makeChatTitleFromMessage(rawText || attachments[0]?.name || 'New Chat');
           const created = await createChatRow(session.user.id, title, selectedModelId);
           currentChatId = created.id;
           latestSelectedChatRef.current = created.id;
@@ -1087,7 +1398,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           chatId: currentChatId,
           userId: session.user.id,
           role: 'user',
-          content: rawText,
+          content: fullUserMessage,
           status: 'complete',
           modelId: selectedModelId,
         });
@@ -1104,6 +1415,99 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           )
         );
 
+        if (isMediaDemo) {
+          const demoContent = `### 🎨 AI Image Generation Output
+
+Here is the visual media output interface. It supports high-resolution stock previews, responsive mobile scaling, tap-to-expand **Fullscreen Lightbox**, and 1-click **Download**:
+
+![Solar Glow Artistry](https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1200&q=80)
+
+---
+
+### 🎬 AI Video Generation Output
+
+Here is the video player interface. It plays inline with native controls on desktop and mobile without forced fullscreen, and features a 1-click **Download** action:
+
+[Watch Cinematic Amber Horizon Video](https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4)
+
+---
+
+### 🎵 AI Audio Generation Output
+
+Here is the dynamic audio player interface (e.g. Whisper, Kokoro, TTS, audio models). Features animated living waveforms, track playback controls, and 1-click **Download**:
+
+[Acoustic Solar Atmosphere](https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3)
+
+---
+
+### 📐 Vector Graphics Output (SVG)
+
+Here is a vector graphic generated on the fly. Switch between the live rendered graphic and XML code, or click **Download .svg**:
+
+\`\`\`svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" width="100%" height="240">
+  <defs>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#ea580c" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="#18181b" rx="16" />
+  <circle cx="200" cy="120" r="85" fill="url(#sunGlow)" />
+  <circle cx="200" cy="120" r="44" fill="url(#amberGrad)" />
+  <circle cx="200" cy="120" r="32" fill="#fff" fill-opacity="0.18" />
+  <text x="200" y="195" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#fef3c7" text-anchor="middle" letter-spacing="1">LITTLE SUN • VECTOR ENGINE</text>
+</svg>
+\`\`\`
+
+---
+
+### 📝 Subtitle Track Output (.SRT / .VTT)
+
+Whisper audio transcription and subtitle file output. Displays formatted timecodes and 1-click **Download .srt**:
+
+\`\`\`srt
+1
+00:00:00,000 --> 00:00:02,500
+Welcome to Little Sun 1.6 API edition.
+
+2
+00:00:02,800 --> 00:00:06,200
+All cloud models, web search, media, and file generation are now active.
+
+3
+00:00:06,500 --> 00:00:09,000
+Enjoy seamless audio, video, subtitle, and vector graphics workflows.
+\`\`\`
+
+---
+
+### 📄 Generated Document Output (DOCX / CSV)
+
+Here are generated document files ready for 1-click download:
+
+[Quarterly_Performance_Report.docx](https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf)
+
+[Revenue_Analysis_2026.csv](https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf)
+`;
+
+          const savedAssistant = await insertMessageRow({
+            chatId: currentChatId,
+            userId: session.user.id,
+            role: 'assistant',
+            content: demoContent,
+            status: 'complete',
+            modelId: selectedModelId || 'media-demo',
+          });
+          setMessages((prev) => [...prev, savedAssistant]);
+          return;
+        }
+
         await runAssistantStream(currentChatId, nextMessages, selectedModelId);
       } catch (err) {
         setComposerDraft(rawText);
@@ -1113,11 +1517,26 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       }
     },
-    [session, isAccessRestricted, composerDraft, laptopStatus, activeChatId, chats, messages, selectedModelId, activeModelMeta, runAssistantStream]
+    [
+      session,
+      isAccessRestricted,
+      composerDraft,
+      laptopStatus,
+      activeChatId,
+      chats,
+      messages,
+      selectedModelId,
+      activeModelMeta,
+      runAssistantStream,
+      mode,
+      cloudConfig,
+    ]
   );
 
   const regenerateLastReply = useCallback(async () => {
-    if (!session || !activeChatId || isStreamingRef.current || laptopStatus === 'offline' || isAccessRestricted) return;
+    if (!session || !activeChatId || isStreamingRef.current || isAccessRestricted) return;
+    if (mode === 'local' && laptopStatus === 'offline') return;
+    if (mode === 'cloud' && cloudConfig.keys.length === 0) return;
     if (messages.length === 0) return;
 
     const lastMsg = messages[messages.length - 1];
@@ -1131,7 +1550,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     if (remaining.length === 0) return;
     await runAssistantStream(activeChatId, remaining, selectedModelId);
-  }, [session, activeChatId, laptopStatus, isAccessRestricted, messages, selectedModelId, runAssistantStream]);
+  }, [session, activeChatId, mode, cloudConfig.keys.length, laptopStatus, isAccessRestricted, messages, selectedModelId, runAssistantStream]);
 
   const clearFailedSendError = useCallback(() => {
     setFailedSend(null);
@@ -1151,6 +1570,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       allModels,
       selectedModelId,
       laptopStatus,
+      mode,
+      setMode,
+      cloudConfig,
+      addCloudApiKey,
+      unlinkCloudApiKey,
+      refreshCloudApiKeyModels,
+      cloudStatus,
       isAccessRestricted,
       isStreaming,
       streamingStage,
@@ -1162,6 +1588,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isSettingsOpen,
       isShortcutsOpen,
       settingsSection,
+      isWebSearchActive,
+      searchCooldown,
+      toggleWebSearch,
+      setIsWebSearchActive,
       setIsShortcutsOpen,
       setComposerDraft,
       setSelectedModelId,
@@ -1195,6 +1625,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       allModels,
       selectedModelId,
       laptopStatus,
+      mode,
+      setMode,
+      cloudConfig,
+      addCloudApiKey,
+      unlinkCloudApiKey,
+      refreshCloudApiKeyModels,
+      cloudStatus,
       isAccessRestricted,
       isStreaming,
       streamingStage,
@@ -1206,6 +1643,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isSettingsOpen,
       isShortcutsOpen,
       settingsSection,
+      isWebSearchActive,
+      searchCooldown,
+      toggleWebSearch,
       setIsShortcutsOpen,
       toggleDesktopSidebar,
       setIsSettingsOpen,

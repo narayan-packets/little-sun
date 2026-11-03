@@ -38,8 +38,23 @@ export interface MessageRow {
   created_at: string;
 }
 
-const envSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const envSupabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // fallback
+    }
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+const envSupabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL ? import.meta.env.VITE_SUPABASE_URL : '').trim();
+const envSupabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY ? import.meta.env.VITE_SUPABASE_ANON_KEY : '').trim();
 
 const STORAGE_SUPABASE_URL_KEY = 'littlesun_supabase_url';
 const STORAGE_SUPABASE_KEY_KEY = 'littlesun_supabase_key';
@@ -298,7 +313,7 @@ export async function createChatRow(
 
   const now = new Date().toISOString();
   const row: ChatRow = {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     user_id: userId,
     title: safeTitle,
     model_id: modelId,
@@ -434,7 +449,7 @@ export async function insertMessageRow(params: {
 
   const now = new Date().toISOString();
   const row: MessageRow = {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     chat_id: chatId,
     user_id: userId,
     role,
@@ -531,4 +546,59 @@ export function subscribeToRealtimeSync(
     for (const fn of cleanups) fn();
   };
 }
+
+/**
+ * Upload an ephemeral file to Supabase Storage (bucket: 'chat-uploads') with a 1-hour expiration timestamp.
+ * Automatically falls back to a locally encoded Data URL if Supabase storage bucket is not configured.
+ */
+export async function uploadEphemeralFile(
+  userId: string,
+  file: File
+): Promise<{ url: string; expiresAt: number; path: string }> {
+  const expiresAt = Date.now() + 60 * 60 * 1000; // Strictly 1 hour from upload
+  const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const path = `${userId}/${Date.now()}_${cleanName}`;
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('chat-uploads')
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (!error && data) {
+        const { data: publicUrlData } = supabase.storage
+          .from('chat-uploads')
+          .getPublicUrl(path);
+
+        const urlWithExp = `${publicUrlData.publicUrl}?exp=${expiresAt}`;
+        return {
+          url: urlWithExp,
+          expiresAt,
+          path,
+        };
+      }
+    } catch {
+      // Continue to local fallback
+    }
+  }
+
+  // Graceful local fallback for offline development / non-storage mode
+  const dataUrl = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+
+  const urlWithExp = `${dataUrl}#exp=${expiresAt}`;
+  return {
+    url: urlWithExp,
+    expiresAt,
+    path,
+  };
+}
+
 

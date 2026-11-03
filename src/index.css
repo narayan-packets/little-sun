@@ -122,34 +122,68 @@ body {
   }
 }
 
-/* Luminous Solar Cursor */
-@keyframes solar-pulse {
+/* Architectural Cloud Animations (API Mode) */
+@keyframes cloud-breathe {
   0%, 100% {
-    transform: scale(0.85);
-    opacity: 0.65;
-    box-shadow: 0 0 0 0 rgba(217, 130, 43, 0.4);
+    transform: scale(0.96);
+    opacity: 0.88;
   }
   50% {
-    transform: scale(1.15);
+    transform: scale(1.04);
     opacity: 1;
-    box-shadow: 0 0 8px 3px rgba(217, 130, 43, 0.55);
   }
 }
 
-.solar-cursor {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background-color: var(--accent);
-  box-shadow: 0 0 6px 1px rgba(217, 130, 43, 0.35);
-  animation: solar-pulse 1.35s ease-in-out infinite;
+@keyframes cloud-aura-pulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes cloud-dot-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translateY(0px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-0.8px);
+  }
+}
+
+.cloud-glowing-active {
+  filter: drop-shadow(0 0 6px rgba(217, 130, 43, 0.45)) drop-shadow(0 0 12px rgba(217, 130, 43, 0.25));
+}
+
+.cloud-core-animated {
+  transform-origin: 16px 16px;
+  animation: cloud-breathe 2.4s ease-in-out infinite;
+}
+
+.cloud-aura-animated {
+  transform-origin: 16px 16px;
+  animation: cloud-aura-pulse 2.4s ease-in-out infinite;
+}
+
+.cloud-dot-1 {
+  animation: cloud-dot-pulse 1.8s ease-in-out infinite;
+}
+
+.cloud-dot-2 {
+  animation: cloud-dot-pulse 1.8s ease-in-out 0.9s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .solar-cursor {
+  .cloud-core-animated,
+  .cloud-aura-animated,
+  .cloud-dot-1,
+  .cloud-dot-2 {
     animation: none;
-    opacity: 0.9;
   }
 }
 

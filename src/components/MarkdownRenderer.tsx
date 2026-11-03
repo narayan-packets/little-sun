@@ -15,6 +15,15 @@ import {
 } from 'lucide-react';
 import { copyTextToClipboard } from '../lib/markdown';
 import { InlineMathSpan, MathVisualCard } from './MathVisualizer';
+import {
+  AudioCard,
+  FileDownloadCard,
+  ImageCard,
+  SubtitleCard,
+  SvgCard,
+  VideoCard,
+} from './MediaViewer';
+import { WebSearchSources, type WebSourceItem } from './WebSearchSources';
 
 interface MarkdownRendererProps {
   content: string;
@@ -72,6 +81,21 @@ function looksLikeMathBlock(code: string): boolean {
     return true;
   }
   return false;
+}
+
+function looksLikeSvg(code: string): boolean {
+  const t = code.trim();
+  return (t.startsWith('<svg') || t.startsWith('<?xml')) && t.includes('<svg') && t.includes('</svg>');
+}
+
+function looksLikeSrt(code: string): boolean {
+  const t = code.trim();
+  return /^\d+\r?\n\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}/m.test(t);
+}
+
+function looksLikeVtt(code: string): boolean {
+  const t = code.trim();
+  return t.startsWith('WEBVTT') || /^\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}/m.test(t);
 }
 
 function isStandaloneMathLine(line: string): boolean {
@@ -839,12 +863,29 @@ const TableWithCopy: React.FC<{ children?: React.ReactNode }> = ({ children }) =
 };
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isStreaming }) => {
-  const normalizedContent = useMemo(() => preprocessMathMarkdown(content), [content]);
+  const { cleanContent, sources } = useMemo(() => {
+    const sourcesMatch = /###\s*Sources\s*\r?\n([\s\S]*?)(?=(?:\r?\n#{1,3}\s|$))/i.exec(content);
+    if (!sourcesMatch) {
+      return { cleanContent: preprocessMathMarkdown(content), sources: [] };
+    }
+    const sourcesList: WebSourceItem[] = [];
+    const linkRegex = /[-*]\s*\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g;
+    let m: RegExpExecArray | null;
+    while ((m = linkRegex.exec(sourcesMatch[1])) !== null) {
+      sourcesList.push({ title: m[1].trim(), url: m[2].trim() });
+    }
+    const stripped = content.replace(sourcesMatch[0], '').trimEnd();
+    return {
+      cleanContent: preprocessMathMarkdown(stripped),
+      sources: sourcesList,
+    };
+  }, [content]);
 
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
+    <>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
         p({ children }) {
           return <p>{children}</p>;
         },
@@ -880,6 +921,20 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
               return <MathVisualCard code={rawCode} isStreaming={isStreaming} />;
             }
 
+            if (language === 'svg' || looksLikeSvg(rawCode)) {
+              return <SvgCard code={rawCode} />;
+            }
+            if (language === 'srt' || looksLikeSrt(rawCode)) {
+              return <SubtitleCard code={rawCode} format="srt" />;
+            }
+            if (language === 'vtt' || looksLikeVtt(rawCode)) {
+              return <SubtitleCard code={rawCode} format="vtt" />;
+            }
+            if (language.startsWith('file:') || language.startsWith('filename:')) {
+              const fname = language.split(':').slice(1).join(':').trim() || 'document.txt';
+              return <FileDownloadCard filename={fname} content={rawCode} />;
+            }
+
             return (
               <CodeBlock
                 language={language}
@@ -892,6 +947,15 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
           const fallbackCode = extractNodeText(children).replace(/\n$/, '');
           if (looksLikeMathBlock(fallbackCode)) {
             return <MathVisualCard code={fallbackCode} isStreaming={isStreaming} />;
+          }
+          if (looksLikeSvg(fallbackCode)) {
+            return <SvgCard code={fallbackCode} />;
+          }
+          if (looksLikeSrt(fallbackCode)) {
+            return <SubtitleCard code={fallbackCode} format="srt" />;
+          }
+          if (looksLikeVtt(fallbackCode)) {
+            return <SubtitleCard code={fallbackCode} format="vtt" />;
           }
           return <CodeBlock language="" code={fallbackCode} isStreaming={isStreaming} />;
         },
@@ -907,6 +971,19 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
             const cleanCode = textContent.replace(/\n$/, '');
             if (MATH_LANGS.has(language) || (!language && looksLikeMathBlock(cleanCode))) {
               return <MathVisualCard code={cleanCode} isStreaming={isStreaming} />;
+            }
+            if (language === 'svg' || looksLikeSvg(cleanCode)) {
+              return <SvgCard code={cleanCode} />;
+            }
+            if (language === 'srt' || looksLikeSrt(cleanCode)) {
+              return <SubtitleCard code={cleanCode} format="srt" />;
+            }
+            if (language === 'vtt' || looksLikeVtt(cleanCode)) {
+              return <SubtitleCard code={cleanCode} format="vtt" />;
+            }
+            if (language.startsWith('file:') || language.startsWith('filename:')) {
+              const fname = language.split(':').slice(1).join(':').trim() || 'document.txt';
+              return <FileDownloadCard filename={fname} content={cleanCode} />;
             }
             return (
               <CodeBlock
@@ -924,10 +1001,61 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
         table({ children }) {
           return <TableWithCopy>{children}</TableWithCopy>;
         },
+        img({ src, alt }) {
+          if (!src) return null;
+          const isVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(src);
+          if (isVideo) {
+            return <VideoCard src={src} title={alt} />;
+          }
+          const isAudio = /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i.test(src);
+          if (isAudio) {
+            return <AudioCard src={src} title={alt || 'Audio'} />;
+          }
+          return <ImageCard src={src} alt={alt} />;
+        },
+        a({ href, children }) {
+          if (!href) return <a>{children}</a>;
+          const isVid = /\.(mp4|webm|mov)(\?.*)?$/i.test(href);
+          const isAudio = /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i.test(href);
+          const isImg = /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(href);
+          const isDoc = /\.(docx?|pdf|csv|xlsx?|txt|rtf|srt|vtt|zip)(\?.*)?$/i.test(href);
+          const textLabel = extractNodeText(children);
+
+          if (isVid) {
+            return <VideoCard src={href} title={textLabel || 'Video'} />;
+          }
+          if (isAudio) {
+            return <AudioCard src={href} title={textLabel || 'Audio Track'} />;
+          }
+          if (isImg) {
+            return <ImageCard src={href} alt={textLabel || 'Image'} />;
+          }
+          if (isDoc) {
+            const rawFname = href.split('/').pop()?.split('?')[0] || 'document';
+            return (
+              <FileDownloadCard
+                filename={textLabel && !textLabel.startsWith('http') ? textLabel : rawFname}
+                url={href}
+              />
+            );
+          }
+          return (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-[var(--accent)] hover:opacity-80 transition-opacity break-all sm:break-normal"
+            >
+              {children}
+            </a>
+          );
+        },
       }}
     >
-      {normalizedContent}
+      {cleanContent}
     </ReactMarkdown>
+    {sources.length > 0 && <WebSearchSources sources={sources} />}
+  </>
   );
 };
 

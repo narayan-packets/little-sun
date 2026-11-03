@@ -483,8 +483,26 @@ const server = http.createServer(async (req, res) => {
       llama.beginProcessing();
       writeSse(res, { type: 'status', state: 'generating' });
 
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      const timeStr = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      const dynamicSystemPrompt = [
+        modelCfg.systemPrompt,
+        `Temporal Context: Today is ${dateStr}. Current local time is ${timeStr}.`,
+      ].join('\n\n');
+
       const upstreamMessages = [
-        { role: 'system', content: modelCfg.systemPrompt },
+        { role: 'system', content: dynamicSystemPrompt },
         ...sanitizedMessages,
       ];
 

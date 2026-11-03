@@ -84,3 +84,36 @@ begin
     alter publication supabase_realtime add table public.messages;
   end if;
 end $$;
+
+-- 6. Ephemeral Chat Attachments Storage Bucket & 1-Hour Expiration Policies (V1.7)
+insert into storage.buckets (id, name, public)
+values ('chat-uploads', 'chat-uploads', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Users can upload ephemeral attachments" on storage.objects;
+create policy "Users can upload ephemeral attachments" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'chat-uploads' and (auth.uid())::text = (storage.foldername(name))[1]);
+
+drop policy if exists "Public read for ephemeral attachments" on storage.objects;
+create policy "Public read for ephemeral attachments" on storage.objects
+  for select
+  using (bucket_id = 'chat-uploads');
+
+drop policy if exists "Users can delete own ephemeral attachments" on storage.objects;
+create policy "Users can delete own ephemeral attachments" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'chat-uploads' and (auth.uid())::text = (storage.foldername(name))[1]);
+
+-- Ephemeral storage cleanup function (files older than 1 hour)
+create or replace function public.delete_expired_ephemeral_uploads()
+returns void
+language plpgsql
+security definer
+as $$
+begin
+  delete from storage.objects
+  where bucket_id = 'chat-uploads'
+    and created_at < now() - interval '1 hour';
+end;
+$$;

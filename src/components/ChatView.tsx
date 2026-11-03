@@ -5,6 +5,7 @@ import {
   BookOpen,
   Calculator,
   Code2,
+  Film,
   Menu,
   PanelLeft,
   PenLine,
@@ -17,12 +18,14 @@ import { MessageItem } from './MessageItem';
 import { ModelPicker } from './ModelPicker';
 import { StatusPill } from './StatusPill';
 import { SunMark } from './SunMark';
+import { CloudMark } from './CloudMark';
 
 const SUGGESTION_PILLS = [
   { label: 'Write', icon: PenLine, prompt: 'Write a ' },
   { label: 'Learn', icon: BookOpen, prompt: 'Explain ' },
   { label: 'Code', icon: Code2, prompt: 'Write a program to ' },
   { label: 'Solve Math', icon: Calculator, prompt: 'Can you solve this math problem step-by-step with LaTeX: ' },
+  { label: 'Media Demo', icon: Film, prompt: 'Preview media generated interface with image and video placeholders' },
 ];
 
 function getHeroGreeting(name: string): string {
@@ -43,6 +46,7 @@ export const ChatView: React.FC = () => {
     activeChatId,
     messages,
     laptopStatus,
+    mode,
     isAccessRestricted,
     isStreaming,
     streamingStage,
@@ -262,11 +266,20 @@ export const ChatView: React.FC = () => {
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="flex-1 flex flex-col items-center justify-center px-3.5 sm:px-4 pb-8 sm:pb-16 overflow-y-auto w-full"
           >
-            <div className="w-full max-w-[680px] mx-auto flex flex-col items-center">
-              {/* Claude-style Hero Greeting: SunMark + Time-aware Greeting in Editorial Serif */}
+            <div className="w-full max-w-[720px] mx-auto flex flex-col items-center">
+              {/* Claude-style Hero Greeting: SunMark/CloudMark + Time-aware Greeting in Editorial Serif */}
               <div className="inline-flex items-center justify-center gap-2.5 sm:gap-3.5 mb-5 sm:mb-7 select-none">
-                <SunMark size={30} state="waking" animated className="sm:hidden" />
-                <SunMark size={38} state="waking" animated className="hidden sm:inline-block" />
+                {mode === 'cloud' ? (
+                  <>
+                    <CloudMark size={30} state="idle" className="sm:hidden" />
+                    <CloudMark size={38} state="idle" className="hidden sm:inline-block" />
+                  </>
+                ) : (
+                  <>
+                    <SunMark size={30} state="waking" animated className="sm:hidden" />
+                    <SunMark size={38} state="waking" animated className="hidden sm:inline-block" />
+                  </>
+                )}
                 <h1
                   className="text-2xl sm:text-4xl font-normal tracking-tight text-center"
                   style={{
@@ -367,7 +380,6 @@ export const ChatView: React.FC = () => {
                     {streamingContent ? (
                       <div className="w-full max-w-full min-w-0 ls-markdown">
                         <MarkdownRenderer content={streamingContent} isStreaming />
-                        <span className="solar-cursor mt-2" aria-label="Generating" />
                       </div>
                     ) : (
                       <div
@@ -377,10 +389,21 @@ export const ChatView: React.FC = () => {
                           borderColor: 'var(--border)',
                         }}
                       >
-                        <SunMark size={16} state="waking" animated />
-                        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                          {streamingStage === 'loading_model' ? 'Waking model…' : 'Thinking…'}
-                        </span>
+                        {mode === 'cloud' ? (
+                          <>
+                            <CloudMark size={16} state="generating" animated />
+                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                              Generating…
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <SunMark size={16} state="waking" animated />
+                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                              {streamingStage === 'loading_model' ? 'Waking model…' : 'Thinking…'}
+                            </span>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
