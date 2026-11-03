@@ -35,6 +35,7 @@ import {
 } from '../lib/cloudApi';
 import { sanitizeCandidateUrl } from '../lib/gateway';
 import { MAX_MEMORIES } from '../lib/memory';
+import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog';
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -259,9 +260,41 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleClearAllMemories = async () => {
-    if (window.confirm('Are you sure you want to clear all stored memories?')) {
+  // Custom Delete Confirm Dialog states (replacing browser default confirm)
+  const [isClearAllMemoriesOpen, setIsClearAllMemoriesOpen] = useState(false);
+  const [memoryToDelete, setMemoryToDelete] = useState<{ id: string; content: string } | null>(null);
+  const [keyToUnlink, setKeyToUnlink] = useState<{ id: string; label: string } | null>(null);
+  const [isDeletingAction, setIsDeletingAction] = useState(false);
+
+  const handleConfirmClearAllMemories = async () => {
+    setIsDeletingAction(true);
+    try {
       await clearMemories();
+      setIsClearAllMemoriesOpen(false);
+    } finally {
+      setIsDeletingAction(false);
+    }
+  };
+
+  const handleConfirmDeleteMemory = async () => {
+    if (!memoryToDelete) return;
+    setIsDeletingAction(true);
+    try {
+      await removeMemory(memoryToDelete.id);
+      setMemoryToDelete(null);
+    } finally {
+      setIsDeletingAction(false);
+    }
+  };
+
+  const handleConfirmUnlinkKey = async () => {
+    if (!keyToUnlink) return;
+    setIsDeletingAction(true);
+    try {
+      await unlinkCloudApiKey(keyToUnlink.id);
+      setKeyToUnlink(null);
+    } finally {
+      setIsDeletingAction(false);
     }
   };
 
@@ -738,7 +771,7 @@ export const SettingsPage: React.FC = () => {
                     {memories.length > 0 && (
                       <button
                         type="button"
-                        onClick={handleClearAllMemories}
+                        onClick={() => setIsClearAllMemoriesOpen(true)}
                         className="text-xs text-[var(--danger)] hover:underline cursor-pointer transition-colors"
                       >
                         Clear all
@@ -795,7 +828,7 @@ export const SettingsPage: React.FC = () => {
 
                           <button
                             type="button"
-                            onClick={() => removeMemory(m.id)}
+                            onClick={() => setMemoryToDelete({ id: m.id, content: m.content })}
                             className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--surface)] transition-colors cursor-pointer shrink-0"
                             title="Delete memory"
                             aria-label="Delete memory"
@@ -1182,7 +1215,7 @@ export const SettingsPage: React.FC = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => unlinkCloudApiKey(k.id)}
+                                onClick={() => setKeyToUnlink({ id: k.id, label: k.label })}
                                 className="p-2 rounded hover:bg-red-500/10 text-[var(--danger)] transition-colors cursor-pointer"
                                 title="Unlink this API key"
                               >
@@ -1459,6 +1492,67 @@ export const SettingsPage: React.FC = () => {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Custom Delete Confirmation Dialogs */}
+      <DeleteConfirmDialog
+        isOpen={isClearAllMemoriesOpen}
+        title="Clear All Memories?"
+        description="This will permanently delete all remembered facts and preferences across your conversations. This action cannot be undone."
+        confirmLabel="Clear All"
+        cancelLabel="Cancel"
+        icon="trash"
+        isLoading={isDeletingAction}
+        onConfirm={handleConfirmClearAllMemories}
+        onClose={() => !isDeletingAction && setIsClearAllMemoriesOpen(false)}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={memoryToDelete !== null}
+        title="Delete Memory?"
+        description={
+          memoryToDelete ? (
+            <span>
+              Are you sure you want to forget{' '}
+              <span className="font-semibold" style={{ color: 'var(--text)' }}>
+                “{memoryToDelete.content}”
+              </span>
+              ? This action cannot be undone.
+            </span>
+          ) : (
+            'Are you sure you want to delete this memory?'
+          )
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        icon="trash"
+        isLoading={isDeletingAction}
+        onConfirm={handleConfirmDeleteMemory}
+        onClose={() => !isDeletingAction && setMemoryToDelete(null)}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={keyToUnlink !== null}
+        title="Unlink API Key?"
+        description={
+          keyToUnlink ? (
+            <span>
+              Are you sure you want to unlink your{' '}
+              <span className="font-semibold" style={{ color: 'var(--text)' }}>
+                {keyToUnlink.label}
+              </span>{' '}
+              API key? Associated models will become unavailable until you link a key again.
+            </span>
+          ) : (
+            'Are you sure you want to unlink this API key?'
+          )
+        }
+        confirmLabel="Unlink Key"
+        cancelLabel="Cancel"
+        icon="warning"
+        isLoading={isDeletingAction}
+        onConfirm={handleConfirmUnlinkKey}
+        onClose={() => !isDeletingAction && setKeyToUnlink(null)}
+      />
     </div>
   );
 };

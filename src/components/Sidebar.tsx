@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { ChatRow } from '../lib/supabase';
 import { useAppState } from '../state/store';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 const SIDEBAR_DATE_FILTER_KEY = 'littlesun_sidebar_by_date_v1';
 
@@ -65,6 +66,7 @@ export const Sidebar: React.FC = () => {
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDeleteChatId, setConfirmDeleteChatId] = useState<string | null>(null);
+  const [isDeletingChat, setIsDeletingChat] = useState(false);
   const [showByDate, setShowByDate] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(SIDEBAR_DATE_FILTER_KEY);
@@ -116,16 +118,25 @@ export const Sidebar: React.FC = () => {
     }
   };
 
+  const chatToDelete = useMemo(
+    () => chats.find((c) => c.id === confirmDeleteChatId),
+    [chats, confirmDeleteChatId]
+  );
+
   const handleConfirmDelete = async (chatId: string) => {
-    setConfirmDeleteChatId(null);
-    setMenuChatId(null);
-    await deleteChat(chatId);
+    setIsDeletingChat(true);
+    try {
+      await deleteChat(chatId);
+      setConfirmDeleteChatId(null);
+      setMenuChatId(null);
+    } finally {
+      setIsDeletingChat(false);
+    }
   };
 
   const renderChatItem = (chat: ChatRow) => {
             const isActive = chat.id === activeChatId && !isSettingsOpen;
             const isRenaming = renamingChatId === chat.id;
-            const isConfirmingDelete = confirmDeleteChatId === chat.id;
             const isMenuOpen = menuChatId === chat.id;
 
             if (isRenaming) {
@@ -172,50 +183,6 @@ export const Sidebar: React.FC = () => {
                   >
                     <X className="w-4 h-4" />
                   </button>
-                </div>
-              );
-            }
-
-            if (isConfirmingDelete) {
-              return (
-                <div
-                  key={chat.id}
-                  className="px-3 py-2.5 text-xs border"
-                  style={{
-                    backgroundColor: 'var(--surface-2)',
-                    borderColor: 'var(--border)',
-                    borderRadius: 'var(--radius-sm)',
-                  }}
-                >
-                  <p className="mb-2 font-medium" style={{ color: 'var(--text)' }}>
-                    Delete “{chat.title}”?
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmDelete(chat.id)}
-                      className="min-h-[36px] px-3 py-1.5 font-medium cursor-pointer"
-                      style={{
-                        backgroundColor: 'var(--danger)',
-                        color: '#FFFFFF',
-                        borderRadius: '6px',
-                      }}
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteChatId(null)}
-                      className="min-h-[36px] px-3 py-1.5 font-medium cursor-pointer"
-                      style={{
-                        backgroundColor: 'var(--surface)',
-                        color: 'var(--text)',
-                        borderRadius: '6px',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
                 </div>
               );
             }
@@ -516,6 +483,35 @@ export const Sidebar: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Delete Conversation Confirmation Dialog */}
+      <DeleteConfirmDialog
+        isOpen={Boolean(confirmDeleteChatId)}
+        title="Delete Conversation?"
+        description={
+          chatToDelete ? (
+            <span>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold" style={{ color: 'var(--text)' }}>
+                “{chatToDelete.title}”
+              </span>
+              ? All messages in this conversation will be permanently removed.
+            </span>
+          ) : (
+            'All messages in this conversation will be permanently removed.'
+          )
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        icon="trash"
+        isLoading={isDeletingChat}
+        onConfirm={() => {
+          if (confirmDeleteChatId) {
+            return handleConfirmDelete(confirmDeleteChatId);
+          }
+        }}
+        onClose={() => !isDeletingChat && setConfirmDeleteChatId(null)}
+      />
     </>
   );
 };
