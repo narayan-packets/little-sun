@@ -88,14 +88,61 @@ function looksLikeSvg(code: string): boolean {
   return (t.startsWith('<svg') || t.startsWith('<?xml')) && t.includes('<svg') && t.includes('</svg>');
 }
 
-function looksLikeSrt(code: string): boolean {
-  const t = code.trim();
-  return /^\d+\r?\n\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}/m.test(t);
-}
+const SUBTITLE_LANGS = new Set([
+  'srt',
+  'vtt',
+  'sub',
+  'subtitle',
+  'subtitles',
+  'subrip',
+  'webvtt',
+  'sbv',
+  'caption',
+  'captions',
+]);
 
 function looksLikeVtt(code: string): boolean {
   const t = code.trim();
-  return t.startsWith('WEBVTT') || /^\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}/m.test(t);
+  return /^WEBVTT\b/i.test(t) || /^\d{2}:\d{2}:\d{2}\.\d{3}\s*-->/m.test(t);
+}
+
+function looksLikeSubtitle(code: string): boolean {
+  const t = code.trim();
+  if (!t || t.length < 8) return false;
+
+  // Standard cue arrow format (e.g. 00:00:01,000 --> 00:00:04,000 or 00:01 -> 00:05 or 00:01 - 00:05)
+  if (
+    /\d{1,2}:\d{2}(?::\d{2})?(?:[,\.]\d{1,3})?\s*(?:-->|->|–|-)\s*\d{1,2}:\d{2}(?::\d{2})?(?:[,\.]\d{1,3})?/m.test(
+      t
+    )
+  ) {
+    return true;
+  }
+
+  // WEBVTT header
+  if (/^WEBVTT\b/i.test(t)) {
+    return true;
+  }
+
+  // Line-by-line timestamped subtitles (e.g. 00:00.000 English Welcome to the movie "Big Buck Bunny"!)
+  const lines = t.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return false;
+
+  let timestampedLines = 0;
+  const lineTimeRegex = /^(?:\[|\()?(\d{1,2}:\d{2}(?::\d{2})?(?:[,\.]\d{1,3})?)(?:\]|\))?\s+(.*)$/;
+
+  for (const line of lines) {
+    const match = lineTimeRegex.exec(line);
+    if (match) {
+      const remainder = match[2].trim();
+      // Ensure not server logs like "12:00:01 INFO ..."
+      if (!/^(?:INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\b/i.test(remainder)) {
+        timestampedLines++;
+      }
+    }
+  }
+
+  return timestampedLines >= 2 && timestampedLines / lines.length >= 0.35;
 }
 
 function isStandaloneMathLine(line: string): boolean {
@@ -223,6 +270,48 @@ function preprocessMathMarkdown(raw: string): string {
       return processedLines.join('\n');
     })
     .join('');
+}
+
+/**
+ * Repairs unclosed code fences, unwraps conversational sentences accidentally
+ * enclosed in backticks, and separates conversational postscripts that got trapped
+ * inside an unclosed code block.
+ */
+function repairUnclosedFences(raw: string, isStreaming?: boolean): string {
+  if (!raw) return raw;
+
+  // 1. Unwrap conversational sentences accidentally trapped inside triple backticks:
+  // e.g. ```\nIf you need help with something else, feel free to ask!\n```
+  let text = raw.replace(
+    /```(?:[a-zA-Z0-9_-]+)?\s*\n\s*((?:If you (?:need|have|would|want)|Feel free to|Let me know|Hope this helps|Please note|I hope|Thank you)[^\n`]+)\s*\n```/gi,
+    '\n\n$1\n\n'
+  );
+
+  // 2. Count triple backtick fences
+  const fenceMatches = text.match(/```/g);
+  const fenceCount = fenceMatches ? fenceMatches.length : 0;
+
+  // If fence count is odd, there is an unclosed code block!
+  if (fenceCount % 2 === 1) {
+    const lastFenceIdx = text.lastIndexOf('```');
+    const afterFence = text.slice(lastFenceIdx + 3);
+
+    // Look for conversational postscripts after double newline inside the unclosed block:
+    // e.g. \n\nIf you need help with something else, feel free to ask!
+    // or \n\nPlease note that the content provided is from the movie...
+    const postscriptRegex = /\n\s*\n\s*(\b(?:If you (?:need|have|would|want)|Feel free to|Let me know|Hope this helps|Please note|Note:|I hope|Don't hesitate|You can also)[^\n]*[\s\S]*)$/i;
+    const postscriptMatch = postscriptRegex.exec(afterFence);
+
+    if (postscriptMatch) {
+      const splitPos = lastFenceIdx + 3 + postscriptMatch.index;
+      text = text.slice(0, splitPos) + '\n```\n\n' + postscriptMatch[1].trim();
+    } else if (!isStreaming) {
+      // If not streaming and generation has ended, automatically close the unclosed code block
+      text = text.trimEnd() + '\n```\n';
+    }
+  }
+
+  return text;
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -502,6 +591,19 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, isStreaming }) =>
 
   const lines = useMemo(() => code.split('\n'), [code]);
   const lineCount = lines.length;
+
+  // If the block contains only a conversational sign-off (e.g. "If you need help with something else, feel free to ask!"),
+  // render it as regular text rather than an awkward code box
+  if (
+    (!normalizedLang || isTextBlock) &&
+    lineCount <= 3 &&
+    /^(?:If you (?:need|have|would|want)|Feel free to|Let me know|Hope this helps|Please note|I hope|Thank you|You're welcome)\b/i.test(
+      code.trim()
+    )
+  ) {
+    return <p className="my-2 text-[15px] leading-relaxed">{code.trim()}</p>;
+  }
+
   const showLineNumbers = !isTextBlock && !isShellBlock && lineCount > 1;
   const canCollapse = !isStreaming && lineCount > 32;
   const displayedLines = canCollapse && isCollapsed ? lines.slice(0, 18) : lines;
@@ -865,21 +967,24 @@ const TableWithCopy: React.FC<{ children?: React.ReactNode }> = ({ children }) =
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isStreaming }) => {
   const { cleanContent, sources } = useMemo(() => {
     const sourcesMatch = /###\s*Sources\s*\r?\n([\s\S]*?)(?=(?:\r?\n#{1,3}\s|$))/i.exec(content);
-    if (!sourcesMatch) {
-      return { cleanContent: preprocessMathMarkdown(content), sources: [] };
-    }
+    let stripped = content;
     const sourcesList: WebSourceItem[] = [];
-    const linkRegex = /[-*]\s*\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g;
-    let m: RegExpExecArray | null;
-    while ((m = linkRegex.exec(sourcesMatch[1])) !== null) {
-      sourcesList.push({ title: m[1].trim(), url: m[2].trim() });
+
+    if (sourcesMatch) {
+      const linkRegex = /[-*]\s*\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g;
+      let m: RegExpExecArray | null;
+      while ((m = linkRegex.exec(sourcesMatch[1])) !== null) {
+        sourcesList.push({ title: m[1].trim(), url: m[2].trim() });
+      }
+      stripped = content.replace(sourcesMatch[0], '').trimEnd();
     }
-    const stripped = content.replace(sourcesMatch[0], '').trimEnd();
+
+    const repaired = repairUnclosedFences(stripped, isStreaming);
     return {
-      cleanContent: preprocessMathMarkdown(stripped),
+      cleanContent: preprocessMathMarkdown(repaired),
       sources: sourcesList,
     };
-  }, [content]);
+  }, [content, isStreaming]);
 
   return (
     <>
@@ -924,11 +1029,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
             if (language === 'svg' || looksLikeSvg(rawCode)) {
               return <SvgCard code={rawCode} />;
             }
-            if (language === 'srt' || looksLikeSrt(rawCode)) {
-              return <SubtitleCard code={rawCode} format="srt" />;
-            }
-            if (language === 'vtt' || looksLikeVtt(rawCode)) {
-              return <SubtitleCard code={rawCode} format="vtt" />;
+            if (SUBTITLE_LANGS.has(language) || looksLikeSubtitle(rawCode)) {
+              const isVtt = language === 'vtt' || looksLikeVtt(rawCode);
+              return <SubtitleCard code={rawCode} format={isVtt ? 'vtt' : 'srt'} />;
             }
             if (language.startsWith('file:') || language.startsWith('filename:')) {
               const fname = language.split(':').slice(1).join(':').trim() || 'document.txt';
@@ -951,11 +1054,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
           if (looksLikeSvg(fallbackCode)) {
             return <SvgCard code={fallbackCode} />;
           }
-          if (looksLikeSrt(fallbackCode)) {
-            return <SubtitleCard code={fallbackCode} format="srt" />;
-          }
-          if (looksLikeVtt(fallbackCode)) {
-            return <SubtitleCard code={fallbackCode} format="vtt" />;
+          if (looksLikeSubtitle(fallbackCode)) {
+            return <SubtitleCard code={fallbackCode} format={looksLikeVtt(fallbackCode) ? 'vtt' : 'srt'} />;
           }
           return <CodeBlock language="" code={fallbackCode} isStreaming={isStreaming} />;
         },
@@ -975,11 +1075,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
             if (language === 'svg' || looksLikeSvg(cleanCode)) {
               return <SvgCard code={cleanCode} />;
             }
-            if (language === 'srt' || looksLikeSrt(cleanCode)) {
-              return <SubtitleCard code={cleanCode} format="srt" />;
-            }
-            if (language === 'vtt' || looksLikeVtt(cleanCode)) {
-              return <SubtitleCard code={cleanCode} format="vtt" />;
+            if (SUBTITLE_LANGS.has(language) || looksLikeSubtitle(cleanCode)) {
+              const isVtt = language === 'vtt' || looksLikeVtt(cleanCode);
+              return <SubtitleCard code={cleanCode} format={isVtt ? 'vtt' : 'srt'} />;
             }
             if (language.startsWith('file:') || language.startsWith('filename:')) {
               const fname = language.split(':').slice(1).join(':').trim() || 'document.txt';

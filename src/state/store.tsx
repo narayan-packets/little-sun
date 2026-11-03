@@ -1426,7 +1426,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             throw new Error('No API key linked for this model. Please link an API key in Settings > Cloud API.');
           }
           const baseSystemPrompt =
-            `You are Little Sun, a calm, direct, and thoughtful AI assistant. Answer questions concisely, naturally, and accurately. When calculations, math, or equations are involved, use LaTeX ($$...$$ or $...$). When generating images or videos, provide markdown image/video links. When generating vector graphics, output clean SVG in \`\`\`svg blocks. When generating subtitles, output valid timestamps in \`\`\`srt or \`\`\`vtt blocks.\n\n${temporalContext}`;
+            `You are Little Sun, a calm, direct, and thoughtful AI assistant. Answer questions concisely, naturally, and accurately. When calculations, math, or equations are involved, use LaTeX ($$...$$ or $...$). When generating images or videos, provide markdown image/video links. When generating vector graphics, output clean SVG in \`\`\`svg blocks. When generating subtitles or SRT files, output standard SubRip cues inside \`\`\`srt blocks with sequential cue numbers and arrow timecodes (e.g.:\n1\n00:00:00,000 --> 00:00:02,500\nSubtitle text).\n\n${temporalContext}`;
           const fullSystemPrompt = [baseSystemPrompt, memoryContext].filter(Boolean).join('\n\n');
 
           await streamCloudChat({

@@ -661,6 +661,177 @@ export const SvgCard: React.FC<SvgCardProps> = ({ code, title = 'Vector Graphic 
 /* SubtitleCard: Subtitles (.SRT / .VTT) Output & Download                   */
 /* ========================================================================= */
 
+export interface SubtitleCue {
+  id: number;
+  start: string;
+  end: string;
+  text: string;
+}
+
+export function parseTimestampToMs(timeStr: string): number {
+  if (!timeStr) return 0;
+  const clean = timeStr.replace(/[\[\]\(\)]/g, '').trim();
+  const parts = clean.split(':');
+  let hours = 0;
+  let minutes = 0;
+  let seconds = 0;
+  let ms = 0;
+
+  if (parts.length === 3) {
+    hours = parseInt(parts[0], 10) || 0;
+    minutes = parseInt(parts[1], 10) || 0;
+    const secParts = parts[2].split(/[,\.]/);
+    seconds = parseInt(secParts[0], 10) || 0;
+    if (secParts[1]) {
+      ms = parseInt(secParts[1].padEnd(3, '0').slice(0, 3), 10) || 0;
+    }
+  } else if (parts.length === 2) {
+    minutes = parseInt(parts[0], 10) || 0;
+    const secParts = parts[1].split(/[,\.]/);
+    seconds = parseInt(secParts[0], 10) || 0;
+    if (secParts[1]) {
+      ms = parseInt(secParts[1].padEnd(3, '0').slice(0, 3), 10) || 0;
+    }
+  } else if (parts.length === 1) {
+    const secParts = parts[0].split(/[,\.]/);
+    seconds = parseInt(secParts[0], 10) || 0;
+    if (secParts[1]) {
+      ms = parseInt(secParts[1].padEnd(3, '0').slice(0, 3), 10) || 0;
+    }
+  }
+  return hours * 3600000 + minutes * 60000 + seconds * 1000 + ms;
+}
+
+export function formatMsToTimecode(ms: number, format: 'srt' | 'vtt'): string {
+  const safeMs = Math.max(0, ms);
+  const hours = Math.floor(safeMs / 3600000);
+  const minutes = Math.floor((safeMs % 3600000) / 60000);
+  const seconds = Math.floor((safeMs % 60000) / 1000);
+  const millis = safeMs % 1000;
+
+  const hh = String(hours).padStart(2, '0');
+  const mm = String(minutes).padStart(2, '0');
+  const ss = String(seconds).padStart(2, '0');
+  const mmm = String(millis).padStart(3, '0');
+  const sep = format === 'vtt' ? '.' : ',';
+  return `${hh}:${mm}:${ss}${sep}${mmm}`;
+}
+
+export function normalizeSubtitleTrack(
+  rawCode: string,
+  targetFormat: 'srt' | 'vtt' = 'srt'
+): {
+  normalizedCode: string;
+  cues: SubtitleCue[];
+} {
+  const trimmed = (rawCode || '').trim();
+  if (!trimmed) {
+    return { normalizedCode: '', cues: [] };
+  }
+
+  const cues: SubtitleCue[] = [];
+  const arrowRegex = /(\d{1,2}:\d{2}(?::\d{2})?(?:[,\.]\d{1,3})?)\s*(?:-->|->|–|-)\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[,\.]\d{1,3})?)/;
+
+  if (arrowRegex.test(trimmed)) {
+    const rawBlocks = trimmed.replace(/\r\n/g, '\n').split(/\n\s*\n/);
+    let cueIndex = 1;
+
+    for (const block of rawBlocks) {
+      const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length === 0) continue;
+
+      const arrowLineIdx = lines.findIndex((l) => arrowRegex.test(l));
+      if (arrowLineIdx === -1) continue;
+
+      const m = arrowRegex.exec(lines[arrowLineIdx]);
+      if (!m) continue;
+
+      const startMs = parseTimestampToMs(m[1]);
+      const endMs = parseTimestampToMs(m[2]);
+      const textLines = lines.slice(arrowLineIdx + 1);
+      const text = textLines.join('\n').trim();
+
+      cues.push({
+        id: cueIndex++,
+        start: formatMsToTimecode(startMs, targetFormat),
+        end: formatMsToTimecode(endMs > startMs ? endMs : startMs + 2500, targetFormat),
+        text: text || '…',
+      });
+    }
+  }
+
+  // If no arrow cues were found, parse line-by-line timestamped format (e.g. 00:00.000 English Welcome...)
+  if (cues.length === 0) {
+    const rawLines = trimmed.replace(/\r\n/g, '\n').split('\n');
+    const parsedEntries: Array<{ startMs: number; rawText: string }> = [];
+    const lineTimeRegex = /^\s*(?:\[|\()?(\d{1,2}:\d{2}(?::\d{2})?(?:[,\.]\d{1,3})?)(?:\]|\))?\s+(.*)$/;
+
+    for (const line of rawLines) {
+      const match = lineTimeRegex.exec(line);
+      if (match) {
+        const ms = parseTimestampToMs(match[1]);
+        parsedEntries.push({
+          startMs: ms,
+          rawText: match[2].trim(),
+        });
+      }
+    }
+
+    if (parsedEntries.length > 0) {
+      // Check if there is a repeated language token like "English " or "[English] " across the cues
+      const langPrefixRegex = /^(?:[A-Za-z]{2,12}:?\s+|\[[A-Za-z]{2,12}\]\s*)/;
+      const prefixes = parsedEntries.map((e) => {
+        const m = langPrefixRegex.exec(e.rawText);
+        return m ? m[0].trim().toLowerCase() : '';
+      });
+      const firstPrefix = prefixes[0];
+      const matchCount = firstPrefix ? prefixes.filter((p) => p === firstPrefix).length : 0;
+      const isLanguageCommon = matchCount >= parsedEntries.length * 0.4;
+
+      for (let i = 0; i < parsedEntries.length; i++) {
+        const cur = parsedEntries[i];
+        let text = cur.rawText;
+        if (isLanguageCommon && firstPrefix && text.toLowerCase().startsWith(firstPrefix)) {
+          text = text.slice(firstPrefix.length).trim();
+          if (text.startsWith(':')) text = text.slice(1).trim();
+        }
+
+        const next = parsedEntries[i + 1];
+        let endMs: number;
+        if (next && next.startMs > cur.startMs) {
+          endMs = next.startMs;
+        } else {
+          endMs = cur.startMs + Math.max(2000, Math.min(5000, text.length * 60));
+        }
+
+        cues.push({
+          id: i + 1,
+          start: formatMsToTimecode(cur.startMs, targetFormat),
+          end: formatMsToTimecode(endMs, targetFormat),
+          text: text || '…',
+        });
+      }
+    }
+  }
+
+  let normalizedCode = '';
+  if (cues.length > 0) {
+    if (targetFormat === 'vtt') {
+      normalizedCode =
+        'WEBVTT\n\n' +
+        cues.map((c) => `${c.id}\n${c.start} --> ${c.end}\n${c.text}`).join('\n\n');
+    } else {
+      normalizedCode = cues
+        .map((c) => `${c.id}\n${c.start} --> ${c.end}\n${c.text}`)
+        .join('\n\n');
+    }
+  } else {
+    normalizedCode = trimmed;
+  }
+
+  return { normalizedCode, cues };
+}
+
 interface SubtitleCardProps {
   code: string;
   format?: 'srt' | 'vtt';
@@ -668,16 +839,26 @@ interface SubtitleCardProps {
 
 export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt' }) => {
   const [copied, setCopied] = useState(false);
-  const ext = format.toLowerCase();
+  const [viewMode, setViewMode] = useState<'cues' | 'raw'>('cues');
+  const ext = format.toLowerCase() as 'srt' | 'vtt';
   const fileName = `little-sun-subtitles-${Date.now()}.${ext}`;
 
+  const { normalizedCode, cues } = useMemo(
+    () => normalizeSubtitleTrack(code, ext),
+    [code, ext]
+  );
+
   const handleDownload = () => {
-    downloadTextAsFile(code, fileName, ext === 'vtt' ? 'text/vtt' : 'application/x-subrip');
+    downloadTextAsFile(
+      normalizedCode,
+      fileName,
+      ext === 'vtt' ? 'text/vtt' : 'application/x-subrip'
+    );
   };
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(normalizedCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -687,19 +868,38 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
 
   return (
     <div
-      className="my-3 max-w-full sm:max-w-lg rounded-xl overflow-hidden border shadow-xs"
+      className="my-3 max-w-full sm:max-w-xl rounded-xl overflow-hidden border shadow-xs"
       style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
     >
+      {/* Header Bar */}
       <div className="p-2 sm:p-2.5 border-b flex items-center justify-between text-xs bg-[var(--surface-2)]">
         <div className="flex items-center gap-1.5 font-medium truncate" style={{ color: 'var(--text)' }}>
-          <Subtitles className="w-3.5 h-3.5 text-[var(--accent)]" />
-          <span>Subtitle Track</span>
-          <span className="text-[10px] uppercase font-mono px-1 py-0.2 rounded border bg-[var(--surface)] text-[var(--text-muted)]">
+          <Subtitles className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+          <span className="truncate">Subtitle Track</span>
+          <span className="text-[10px] uppercase font-mono px-1 py-0.2 rounded border bg-[var(--surface)] text-[var(--text-muted)] shrink-0">
             {ext}
           </span>
+          {cues.length > 0 && (
+            <span className="text-[11px] text-[var(--text-muted)] shrink-0 hidden sm:inline">
+              · {cues.length} {cues.length === 1 ? 'cue' : 'cues'}
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
+          {cues.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setViewMode((v) => (v === 'cues' ? 'raw' : 'cues'))}
+              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+              title={viewMode === 'cues' ? 'View raw subtitle code' : 'View formatted cue cards'}
+            >
+              {viewMode === 'cues' ? <Code className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              <span className="hidden sm:inline">{viewMode === 'cues' ? 'Code' : 'Cues'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleCopy}
@@ -708,8 +908,9 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
             title="Copy subtitle text"
           >
             {copied ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
-            <span>{copied ? 'Copied' : 'Copy'}</span>
+            <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
           </button>
+
           <button
             type="button"
             onClick={handleDownload}
@@ -727,12 +928,51 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
         </div>
       </div>
 
-      <pre
-        className="p-3 text-xs font-mono overflow-x-auto max-h-[220px]"
-        style={{ backgroundColor: 'var(--code-bg)', color: 'var(--text)' }}
-      >
-        {code}
-      </pre>
+      {/* Body: Formatted Cues or Raw Code */}
+      {viewMode === 'cues' && cues.length > 0 ? (
+        <div
+          className="p-2.5 sm:p-3 space-y-1.5 max-h-[300px] overflow-y-auto"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {cues.map((cue) => (
+            <div
+              key={cue.id}
+              className="p-2 sm:p-2.5 rounded-lg border transition-colors flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2.5 text-xs"
+              style={{
+                backgroundColor: 'var(--surface-2)',
+                borderColor: 'var(--border)',
+              }}
+            >
+              <div className="flex items-center gap-1.5 shrink-0 select-none">
+                <span className="text-[10px] font-mono font-medium opacity-60">#{cue.id}</span>
+                <span
+                  className="text-[10.5px] font-mono px-1.5 py-0.5 rounded border"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {cue.start} → {cue.end}
+                </span>
+              </div>
+              <div
+                className="text-[13px] leading-relaxed break-words font-medium"
+                style={{ color: 'var(--text)' }}
+              >
+                {cue.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <pre
+          className="p-3 text-xs font-mono overflow-x-auto max-h-[260px] m-0"
+          style={{ backgroundColor: 'var(--code-bg)', color: 'var(--text)', whiteSpace: 'pre-wrap' }}
+        >
+          {normalizedCode}
+        </pre>
+      )}
     </div>
   );
 };
