@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   Copy,
+  Download,
   RotateCcw,
   Square,
   Volume2,
@@ -12,7 +13,7 @@ import { ttsController, type TtsQueueSnapshot } from '../lib/tts';
 import { useAppState } from '../state/store';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { SunMark } from './SunMark';
-import { ImageCard } from './MediaViewer';
+import { downloadTextAsFile, ImageCard } from './MediaViewer';
 import { FileText } from 'lucide-react';
 
 interface ParsedUserContent {
@@ -173,6 +174,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
     });
   };
 
+  const handleDownloadMarkdown = () => {
+    const cleanId = (message.id || 'reply').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 8);
+    const fname = `little-sun-${cleanId}-${Date.now().toString().slice(-4)}.md`;
+    downloadTextAsFile(message.content, fname, 'text/markdown;charset=utf-8;');
+  };
+
   return (
     <div
       className={`group w-full min-w-0 ${isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}
@@ -228,6 +235,24 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
             </>
           )}
         </button>
+
+        {/* Download as Markdown file button for assistant messages */}
+        {!isUser && (
+          <button
+            type="button"
+            onClick={handleDownloadMarkdown}
+            className="min-h-[38px] px-2 inline-flex items-center justify-center gap-1 text-xs transition-colors cursor-pointer active:scale-95"
+            style={{
+              color: 'var(--text-muted)',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            aria-label="Download message as Markdown"
+            title="Download full response as .md file"
+          >
+            <Download className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">.md</span>
+          </button>
+        )}
 
         {/* Read aloud button with Rotating Sun Animation when loading */}
         <button

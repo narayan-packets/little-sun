@@ -908,6 +908,38 @@ ${escapedBody}
     }
   }
 
+  // Prepend UTF-8 BOM for CSV/TSV so Excel opens unicode/accents correctly
+  if (ext === 'csv' || ext === 'tsv') {
+    const hasBom = content.charCodeAt(0) === 0xfeff;
+    return { data: hasBom ? content : '\uFEFF' + content, mime };
+  }
+
+  // Markdown files: clean UTF-8
+  if (ext === 'md' || ext === 'markdown') {
+    return { data: content, mime: 'text/markdown;charset=utf-8;' };
+  }
+
+  // HTML files: ensure valid html structure if bare body
+  if (ext === 'html' || ext === 'htm') {
+    if (!content.toLowerCase().includes('<html')) {
+      const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${filename}</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; padding: 2rem; max-width: 800px; margin: 0 auto; color: #1f2937; }
+</style>
+</head>
+<body>
+${content}
+</body>
+</html>`;
+      return { data: fullHtml, mime };
+    }
+  }
+
   return { data: content, mime };
 }
 
@@ -943,6 +975,19 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
     const docName = `little-sun-subtitles-${Date.now()}.doc`;
     const { data, mime } = prepareDocumentContent(docText, docName);
     downloadTextAsFile(data, docName, mime);
+  };
+
+  const handleDownloadMd = () => {
+    let mdContent = `# Subtitle Track (${ext.toUpperCase()})\n\n`;
+    if (cues.length > 0) {
+      cues.forEach((c) => {
+        mdContent += `- **${c.start} → ${c.end}**: ${c.text}\n`;
+      });
+    } else {
+      mdContent += normalizedCode;
+    }
+    const mdName = `little-sun-subtitles-${Date.now()}.md`;
+    downloadTextAsFile(mdContent, mdName, 'text/markdown;charset=utf-8;');
   };
 
   const handleCopy = async () => {
@@ -1009,6 +1054,17 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
           >
             <FileText className="w-3 h-3 text-[var(--accent)]" />
             <span>.doc</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadMd}
+            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+            style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+            title="Download dialogue as Markdown .md file"
+          >
+            <FileText className="w-3 h-3 text-amber-500" />
+            <span>.md</span>
           </button>
 
           <button
@@ -1095,7 +1151,17 @@ export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
   fileType,
 }) => {
   const [downloading, setDownloading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
   const ext = (fileType || filename.split('.').pop() || 'file').toLowerCase();
+  const hasContent = typeof content === 'string' && content.length > 0;
+  const contentBytes = hasContent ? new Blob([content]).size : 0;
+  const sizeLabel = useMemo(() => {
+    if (!contentBytes) return null;
+    if (contentBytes < 1024) return `${contentBytes} B`;
+    return `${(contentBytes / 1024).toFixed(1)} KB`;
+  }, [contentBytes]);
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -1108,48 +1174,117 @@ export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
     setDownloading(false);
   };
 
+  const handleCopy = async () => {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // ignore
+    }
+  };
+
   const getIcon = () => {
-    if (['csv', 'xlsx', 'xls'].includes(ext)) return <FileSpreadsheet className="w-4 h-4 text-emerald-500" />;
-    if (['docx', 'doc', 'pdf', 'txt', 'rtf'].includes(ext)) return <FileText className="w-4 h-4 text-[var(--accent)]" />;
+    if (['md', 'markdown'].includes(ext)) return <FileText className="w-4 h-4 text-amber-500" />;
+    if (['csv', 'xlsx', 'xls', 'tsv'].includes(ext)) return <FileSpreadsheet className="w-4 h-4 text-emerald-500" />;
+    if (['docx', 'doc', 'rtf'].includes(ext)) return <FileText className="w-4 h-4 text-sky-500" />;
+    if (['pdf'].includes(ext)) return <FileText className="w-4 h-4 text-rose-500" />;
+    if (['txt', 'log'].includes(ext)) return <FileText className="w-4 h-4 text-[var(--accent)]" />;
     if (['srt', 'vtt'].includes(ext)) return <Subtitles className="w-4 h-4 text-sky-500" />;
-    if (['svg', 'json', 'py', 'js', 'html'].includes(ext)) return <FileCode className="w-4 h-4 text-purple-500" />;
+    if (['svg', 'json', 'py', 'js', 'ts', 'tsx', 'jsx', 'html', 'css', 'sql', 'sh'].includes(ext)) {
+      return <FileCode className="w-4 h-4 text-purple-500" />;
+    }
     return <GenericFileIcon className="w-4 h-4 text-[var(--text-muted)]" />;
   };
 
   return (
     <div
-      className="my-2.5 max-w-full sm:max-w-md rounded-xl p-3 border flex items-center justify-between gap-3 shadow-xs"
+      className="my-3 max-w-full sm:max-w-xl rounded-xl overflow-hidden border shadow-xs"
       style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
     >
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <div className="p-2 rounded-lg bg-[var(--surface-2)] shrink-0">
-          {getIcon()}
+      <div className="p-2 sm:p-2.5 flex items-center justify-between gap-3 text-xs bg-[var(--surface-2)]">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div
+            className="p-1.5 rounded-lg bg-[var(--surface)] border shrink-0"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            {getIcon()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div
+              className="text-xs font-semibold truncate"
+              style={{ color: 'var(--text)' }}
+              title={filename}
+            >
+              {filename}
+            </div>
+            <div className="text-[10px] uppercase font-mono mt-0.5 text-[var(--text-muted)] flex items-center gap-1.5">
+              <span>{ext} Document</span>
+              {sizeLabel && <span>· {sizeLabel}</span>}
+            </div>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }} title={filename}>
-            {filename}
-          </div>
-          <div className="text-[10px] uppercase font-mono mt-0.5 text-[var(--text-muted)]">
-            {ext} Document
-          </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {hasContent && (
+            <button
+              type="button"
+              onClick={() => setShowPreview((v) => !v)}
+              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+              title={showPreview ? 'Hide file preview' : 'View file content'}
+            >
+              {showPreview ? <Eye className="w-3 h-3" /> : <Code className="w-3 h-3" />}
+              <span className="hidden sm:inline">{showPreview ? 'Hide' : 'Preview'}</span>
+            </button>
+          )}
+
+          {hasContent && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+              style={{ borderColor: 'var(--border)' }}
+              title="Copy file content"
+            >
+              {copied ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
+              <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="h-7 px-2.5 inline-flex items-center gap-1 rounded font-medium border text-xs cursor-pointer active:scale-95"
+            style={{
+              backgroundColor: 'var(--accent)',
+              borderColor: 'var(--accent)',
+              color: 'var(--accent-contrast)',
+            }}
+            title={`Download ${filename}`}
+          >
+            <Download className="w-3 h-3" />
+            <span>{downloading ? 'Saving…' : 'Download'}</span>
+          </button>
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleDownload}
-        disabled={downloading}
-        className="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg font-medium border text-xs cursor-pointer active:scale-95 shrink-0"
-        style={{
-          backgroundColor: 'var(--accent)',
-          borderColor: 'var(--accent)',
-          color: 'var(--accent-contrast)',
-        }}
-        title={`Download ${filename}`}
-      >
-        <Download className="w-3.5 h-3.5" />
-        <span>{downloading ? 'Saving…' : 'Download'}</span>
-      </button>
+      {showPreview && hasContent && (
+        <pre
+          className="p-3 text-xs font-mono overflow-x-auto max-h-[260px] m-0 border-t"
+          style={{
+            backgroundColor: 'var(--code-bg)',
+            borderColor: 'var(--border)',
+            color: 'var(--text)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}
+        >
+          {content}
+        </pre>
+      )}
     </div>
   );
 };

@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Code2,
   Copy,
+  Download,
   FileText,
   Quote,
   Table as TableIcon,
@@ -17,6 +18,7 @@ import { copyTextToClipboard } from '../lib/markdown';
 import { InlineMathSpan, MathVisualCard } from './MathVisualizer';
 import {
   AudioCard,
+  downloadTextAsFile,
   FileDownloadCard,
   ImageCard,
   SubtitleCard,
@@ -105,10 +107,17 @@ const DOC_FILE_LANGS = new Set([
   'doc',
   'docx',
   'document',
+  'md',
+  'markdown',
+  'txt',
+  'textfile',
   'rtf',
   'csv',
+  'tsv',
   'xlsx',
   'xls',
+  'jsonfile',
+  'htmlfile',
 ]);
 
 function parseFileDownloadCard(lang: string, code: string) {
@@ -117,13 +126,19 @@ function parseFileDownloadCard(lang: string, code: string) {
     normalized.startsWith('file:') ||
     normalized.startsWith('filename:') ||
     normalized.startsWith('file=') ||
-    normalized.startsWith('filename=')
+    normalized.startsWith('filename=') ||
+    normalized.startsWith('export:') ||
+    normalized.startsWith('export=')
   ) {
-    const fname = normalized.replace(/^(?:file|filename)[:=]/i, '').trim() || 'document.txt';
+    const fname = normalized.replace(/^(?:file|filename|export)[:=]/i, '').trim() || 'document.txt';
     return <FileDownloadCard filename={fname} content={code} />;
   }
   if (DOC_FILE_LANGS.has(normalized)) {
-    const ext = normalized === 'document' ? 'doc' : normalized;
+    let ext = normalized === 'document' ? 'doc' : normalized;
+    if (ext === 'markdown') ext = 'md';
+    if (ext === 'textfile') ext = 'txt';
+    if (ext === 'jsonfile') ext = 'json';
+    if (ext === 'htmlfile') ext = 'html';
     return <FileDownloadCard filename={`document.${ext}`} content={code} />;
   }
   return null;
@@ -648,12 +663,52 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, isStreaming }) =>
 
   const HeaderIcon = isShellBlock ? Terminal : isTextBlock ? FileText : Code2;
 
+  const defaultExtension = useMemo(() => {
+    const l = normalizedLang;
+    if (['python', 'py'].includes(l)) return 'py';
+    if (['javascript', 'js'].includes(l)) return 'js';
+    if (['typescript', 'ts'].includes(l)) return 'ts';
+    if (['tsx'].includes(l)) return 'tsx';
+    if (['jsx'].includes(l)) return 'jsx';
+    if (['bash', 'sh', 'shell', 'zsh'].includes(l)) return 'sh';
+    if (['powershell', 'ps1'].includes(l)) return 'ps1';
+    if (['batch', 'bat', 'cmd'].includes(l)) return 'bat';
+    if (['html', 'htm'].includes(l)) return 'html';
+    if (['css', 'scss'].includes(l)) return 'css';
+    if (['json'].includes(l)) return 'json';
+    if (['yaml', 'yml'].includes(l)) return 'yaml';
+    if (['markdown', 'md'].includes(l)) return 'md';
+    if (['sql'].includes(l)) return 'sql';
+    if (['csv'].includes(l)) return 'csv';
+    if (['svg'].includes(l)) return 'svg';
+    if (['c'].includes(l)) return 'c';
+    if (['cpp', 'c++'].includes(l)) return 'cpp';
+    if (['rust', 'rs'].includes(l)) return 'rs';
+    if (['go', 'golang'].includes(l)) return 'go';
+    if (['java'].includes(l)) return 'java';
+    return isTextBlock ? 'txt' : 'txt';
+  }, [normalizedLang, isTextBlock]);
+
+  const targetFilename = useMemo(() => {
+    const firstLines = lines.slice(0, 2).join('\n');
+    const m = /(?:#|\/\/|<!--|\/\*|--|REM)\s*(?:filename|file)[:=]\s*([a-zA-Z0-9_\-\.\/]+)/i.exec(firstLines);
+    if (m && m[1]) {
+      return m[1].trim().split('/').pop() || `file.${defaultExtension}`;
+    }
+    const cleanLabel = (displayLabel || 'file').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return `${cleanLabel || 'snippet'}.${defaultExtension}`;
+  }, [lines, defaultExtension, displayLabel]);
+
   const handleCopy = async () => {
     const ok = await copyTextToClipboard(code);
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     }
+  };
+
+  const handleDownload = () => {
+    downloadTextAsFile(code, targetFilename);
   };
 
   return (
@@ -738,6 +793,24 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, isStreaming }) =>
                 <span>Copy</span>
               </>
             )}
+          </button>
+
+          {/* Download / Save File Button */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="min-h-[30px] px-2.5 py-1 inline-flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer active:scale-95"
+            style={{
+              color: 'var(--text)',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+            }}
+            aria-label={`Save as ${targetFilename}`}
+            title={`Save as ${targetFilename}`}
+          >
+            <Download className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Save</span>
           </button>
         </div>
       </div>
