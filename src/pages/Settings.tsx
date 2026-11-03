@@ -362,7 +362,7 @@ export const SettingsPage: React.FC = () => {
                 role="tab"
                 aria-selected={currentTab === 'account'}
                 onClick={() => openSettingsSection('account')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'account'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -384,7 +384,7 @@ export const SettingsPage: React.FC = () => {
                 role="tab"
                 aria-selected={currentTab === 'memory'}
                 onClick={() => openSettingsSection('memory')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'memory'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -406,7 +406,7 @@ export const SettingsPage: React.FC = () => {
                 role="tab"
                 aria-selected={currentTab === 'gateway'}
                 onClick={() => openSettingsSection('gateway')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'gateway'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -428,7 +428,7 @@ export const SettingsPage: React.FC = () => {
                 role="tab"
                 aria-selected={currentTab === 'cloud'}
                 onClick={() => openSettingsSection('cloud')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'cloud'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -450,7 +450,7 @@ export const SettingsPage: React.FC = () => {
                 role="tab"
                 aria-selected={currentTab === 'voices'}
                 onClick={() => openSettingsSection('voices')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'voices'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -612,11 +612,11 @@ export const SettingsPage: React.FC = () => {
                       >
                         <Brain className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                       </div>
-                      <div className="min-w-0">
-                        <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
                           Memory
                         </h2>
-                        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-xs leading-normal" style={{ color: 'var(--text-muted)' }}>
                           Preferences and facts remembered across chats
                         </p>
                       </div>
@@ -843,11 +843,11 @@ export const SettingsPage: React.FC = () => {
                       >
                         <Server className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                       </div>
-                      <div className="min-w-0">
-                        <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
                           Gateway
                         </h2>
-                        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-xs leading-normal" style={{ color: 'var(--text-muted)' }}>
                           Local models and TTS via network or Tailscale
                         </p>
                       </div>
