@@ -1,3 +1,5 @@
+import { getDirectGatewayUrl, getGatewayUrl } from './gateway';
+
 export interface WebSearchResult {
   title: string;
   snippet: string;
@@ -76,14 +78,16 @@ export function getSearchCooldownSeconds(): number {
 
 /**
  * Free, zero-API-key Multi-Engine Web Search:
- * 1. DuckDuckGo Instant Answers & Topics (general knowledge & definitions)
- * 2. Wikipedia Live API (encyclopedic, historical, & factual background)
- * 3. Hacker News / Algolia API (fresh technology, software, startup, & world discussions)
+ * 1. Little Sun Gateway Search (Live DuckDuckGo scraping, fresh web news/facts, real clean URLs)
+ * 2. Wikipedia Search API (Open CORS, factual background)
+ * 3. DuckDuckGo Instant Answers & Topics (general definitions)
+ * 4. Hacker News / Algolia API (fresh technology, software, startup, & world discussions)
  */
 export async function performWebSearch(
   query: string,
   limit = 4,
-  onRateLimit?: (seconds: number) => void
+  onRateLimit?: (seconds: number) => void,
+  accessToken?: string
 ): Promise<WebSearchResult[]> {
   const cleanQuery = query.trim();
   if (!cleanQuery) return [];
@@ -98,6 +102,35 @@ export async function performWebSearch(
   if (cooldownSec > 0) {
     if (onRateLimit) onRateLimit(cooldownSec);
     return [];
+  }
+
+  // 3. Engine 1 (Primary): Little Sun Gateway Live DuckDuckGo search (fresh news, stocks, events)
+  const candidateGateway = getDirectGatewayUrl() || getGatewayUrl();
+  if (candidateGateway && !candidateGateway.includes('/gateway-proxy')) {
+    try {
+      const searchUrl = `${candidateGateway}/search?q=${encodeURIComponent(cleanQuery)}&limit=${limit}`;
+      let token = accessToken;
+      if (!token && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        token = 'local-preview-token';
+      }
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const gRes = await fetch(searchUrl, {
+        headers,
+        signal: AbortSignal.timeout(6500),
+      });
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        if (Array.isArray(gData.results) && gData.results.length > 0) {
+          searchTimestamps.push(Date.now());
+          return gData.results.slice(0, limit);
+        }
+      }
+    } catch {
+      // Continue to public multi-engine fallbacks
+    }
   }
 
   searchTimestamps.push(Date.now());
@@ -226,7 +259,7 @@ export function formatSearchResultsForPrompt(query: string, results: WebSearchRe
   if (results.length === 0) return '';
   const trimmed = results.slice(0, 3);
   const lines = trimmed.map(
-    (r, i) => `[Source ${i + 1}] "${r.title}": ${r.snippet.slice(0, 220)}`
+    (r, i) => `[Source ${i + 1}] "${r.title}": ${r.snippet.slice(0, 260)}`
   );
-  return `\n\n[Live Web Search Facts for "${query}"]:\n${lines.join('\n')}\n\n(Directive: Synthesize the facts above directly into your response without repeating the search query, without lecturing, and without overexplaining.)\n\n### Sources\n${trimmed.map((r) => `- [${r.title}](${r.url})`).join('\n')}`;
+  return `\n\n[Live Web Search Facts for "${query}"]:\n${lines.join('\n')}\n\n(Directive: Synthesize the facts above directly into your response without repeating the search query, without lecturing, and without overexplaining.)`;
 }

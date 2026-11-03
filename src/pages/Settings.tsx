@@ -9,9 +9,12 @@ import {
   LogOut,
   RefreshCw,
   RotateCcw,
+  Server,
   Trash2,
   User,
   Volume2,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import {
   getSavedSpeed,
@@ -39,18 +42,41 @@ export const SettingsPage: React.FC = () => {
     unlinkCloudApiKey,
     refreshCloudApiKeyModels,
     models,
+    allModels,
     selectedModelId,
     setSelectedModelId,
     settingsSection,
     openSettingsSection,
     setIsSettingsOpen,
     signOut,
+    laptopStatus,
+    customGatewayUrl,
+    detectedFunnelUrl,
+    activeGatewayEndpoint,
+    updateGatewayUrl,
+    testGatewayConnection,
+    refreshGateway,
   } = useAppState();
 
   const [nameInput, setNameInput] = useState(userDisplayName);
   const [nameSaved, setNameSaved] = useState(false);
   const [voice, setVoice] = useState<PocketVoiceId>(() => getSavedVoice());
   const [speed, setSpeed] = useState<number>(() => getSavedSpeed());
+
+  // Gateway Connection Form State
+  const [gatewayInput, setGatewayInput] = useState(customGatewayUrl || '');
+  const [isTestingGateway, setIsTestingGateway] = useState(false);
+  const [isSavingGateway, setIsSavingGateway] = useState(false);
+  const [gatewayTestResult, setGatewayTestResult] = useState<{
+    ok: boolean;
+    latencyMs?: number;
+    message: string;
+  } | null>(null);
+  const [gatewaySavedBanner, setGatewaySavedBanner] = useState(false);
+
+  useEffect(() => {
+    setGatewayInput(customGatewayUrl || '');
+  }, [customGatewayUrl]);
 
   // Cloud API Link Form State
   const [selectedProvider, setSelectedProvider] = useState<CloudProviderId>('openrouter');
@@ -129,7 +155,86 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const currentTab = settingsSection === 'voices' ? 'voices' : settingsSection === 'cloud' ? 'cloud' : 'account';
+  const handleTestGateway = async () => {
+    const target = gatewayInput.trim() || activeGatewayEndpoint || detectedFunnelUrl || 'http://127.0.0.1:8790';
+    setIsTestingGateway(true);
+    setGatewayTestResult(null);
+    try {
+      const res = await testGatewayConnection(target);
+      if (res.ok) {
+        setGatewayTestResult({
+          ok: true,
+          latencyMs: res.latencyMs,
+          message: `Connected successfully (${res.latencyMs}ms)`,
+        });
+      } else {
+        setGatewayTestResult({
+          ok: false,
+          message: res.error || 'Connection failed',
+        });
+      }
+    } catch (err) {
+      setGatewayTestResult({
+        ok: false,
+        message: err instanceof Error ? err.message : 'Connection failed',
+      });
+    } finally {
+      setIsTestingGateway(false);
+    }
+  };
+
+  const handleSaveGateway = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingGateway(true);
+    setGatewayTestResult(null);
+    try {
+      const ok = await updateGatewayUrl(gatewayInput.trim());
+      setGatewaySavedBanner(true);
+      setTimeout(() => setGatewaySavedBanner(false), 2400);
+      if (ok) {
+        setGatewayTestResult({
+          ok: true,
+          message: 'Saved & connected to Little Sun gateway',
+        });
+      } else {
+        setGatewayTestResult({
+          ok: false,
+          message: 'Saved, but endpoint is unreachable. Verify that your laptop gateway is running.',
+        });
+      }
+    } catch (err) {
+      setGatewayTestResult({
+        ok: false,
+        message: err instanceof Error ? err.message : 'Failed to save gateway URL',
+      });
+    } finally {
+      setIsSavingGateway(false);
+    }
+  };
+
+  const handleUseDetectedFunnel = () => {
+    if (detectedFunnelUrl) {
+      setGatewayInput(detectedFunnelUrl);
+    }
+  };
+
+  const handleResetGateway = async () => {
+    setGatewayInput('');
+    await updateGatewayUrl('');
+    setGatewayTestResult({
+      ok: true,
+      message: 'Reset to auto-detection',
+    });
+  };
+
+  const currentTab =
+    settingsSection === 'voices'
+      ? 'voices'
+      : settingsSection === 'cloud'
+      ? 'cloud'
+      : settingsSection === 'gateway'
+      ? 'gateway'
+      : 'account';
   const canAddMoreKeys = cloudConfig.keys.length < MAX_API_KEYS;
 
   return (
@@ -202,11 +307,11 @@ export const SettingsPage: React.FC = () => {
         }}
       >
         <div className="w-full max-w-[500px] mx-auto">
-          {/* Centered Segmented Navigation (Account | Cloud API | Voices) */}
+          {/* Centered Segmented Navigation (Account | Gateway | Cloud API | Voices) */}
           <div className="flex justify-center mb-6 sm:mb-8">
             <nav
               aria-label="Settings navigation"
-              className="w-full max-w-[400px] grid grid-cols-3 p-1 border select-none rounded-full"
+              className="w-full max-w-[480px] grid grid-cols-4 p-1 border select-none rounded-full"
               style={{
                 backgroundColor: 'var(--surface-2)',
                 borderColor: 'var(--border)',
@@ -218,7 +323,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('account');
                 }}
-                className={`min-h-[38px] px-2 sm:px-4 py-1.5 inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'account'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -236,12 +341,35 @@ export const SettingsPage: React.FC = () => {
               </a>
 
               <a
+                href="/gateway"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openSettingsSection('gateway');
+                }}
+                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                  currentTab === 'gateway'
+                    ? 'shadow-xs font-semibold'
+                    : 'hover:text-[var(--text)]'
+                }`}
+                style={{
+                  backgroundColor: currentTab === 'gateway' ? 'var(--surface)' : 'transparent',
+                  color: currentTab === 'gateway' ? 'var(--text)' : 'var(--text-muted)',
+                }}
+              >
+                <Server
+                  className="w-3.5 h-3.5 shrink-0"
+                  style={{ color: currentTab === 'gateway' ? 'var(--accent)' : 'inherit' }}
+                />
+                <span>Gateway</span>
+              </a>
+
+              <a
                 href="/cloud"
                 onClick={(e) => {
                   e.preventDefault();
                   openSettingsSection('cloud');
                 }}
-                className={`min-h-[38px] px-2 sm:px-4 py-1.5 inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'cloud'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -264,7 +392,7 @@ export const SettingsPage: React.FC = () => {
                   e.preventDefault();
                   openSettingsSection('voices');
                 }}
-                className={`min-h-[38px] px-2 sm:px-4 py-1.5 inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
+                className={`min-h-[38px] px-1.5 sm:px-3 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline active:scale-[0.98] ${
                   currentTab === 'voices'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -395,7 +523,310 @@ export const SettingsPage: React.FC = () => {
             )}
 
             {/* ======================================================== */}
-            {/* TAB 2: Cloud API (Vertical, Multi-Key max 5, Minimal)   */}
+            {/* TAB 2: Gateway (Local Inference & Tailscale Funnel)     */}
+            {/* ======================================================== */}
+            {currentTab === 'gateway' && (
+              <motion.div
+                key="tab-gateway"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                className="space-y-4"
+              >
+                {/* Card 1: Connection Status & Endpoint Configuration */}
+                <div
+                  className="border overflow-hidden divide-y shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  {/* Header Row */}
+                  <div
+                    className="p-4 sm:p-5 flex items-center justify-between gap-3"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent)' }}
+                      >
+                        <Server className="w-4.5 h-4.5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          Inference Gateway
+                        </h2>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Self-hosted LLMs & TTS over LAN or Tailscale Funnel
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Live Status Badge */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          laptopStatus === 'ready' || laptopStatus === 'busy'
+                            ? 'bg-emerald-500 ring-2 ring-emerald-500/20'
+                            : laptopStatus === 'sleeping'
+                            ? 'bg-amber-500 ring-2 ring-amber-500/20'
+                            : laptopStatus === 'waking'
+                            ? 'bg-blue-500 animate-pulse'
+                            : 'bg-neutral-400'
+                        }`}
+                      />
+                      <span className="text-xs font-medium capitalize" style={{ color: 'var(--text)' }}>
+                        {laptopStatus === 'ready' || laptopStatus === 'busy'
+                          ? 'Online'
+                          : laptopStatus === 'sleeping'
+                          ? 'Standby'
+                          : laptopStatus === 'waking'
+                          ? 'Waking'
+                          : 'Offline'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Active Endpoint Info */}
+                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                        Active Connection Endpoint
+                      </span>
+                      <span
+                        className="text-xs font-mono px-2 py-0.5 rounded border max-w-full truncate"
+                        style={{
+                          backgroundColor: 'var(--surface-2)',
+                          borderColor: 'var(--border)',
+                          color: activeGatewayEndpoint ? 'var(--text)' : 'var(--text-muted)',
+                        }}
+                      >
+                        {activeGatewayEndpoint || 'None (probing candidates)'}
+                      </span>
+                    </div>
+
+                    {/* Detected Tailscale Funnel URL from Local Laptop */}
+                    {detectedFunnelUrl && (
+                      <div
+                        className="mb-4 p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                        style={{
+                          backgroundColor: 'var(--surface-2)',
+                          borderColor: 'var(--border)',
+                        }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[11px] font-semibold text-[var(--accent)] uppercase tracking-wider block mb-0.5">
+                            Laptop Tailscale Funnel Detected
+                          </span>
+                          <p className="text-xs font-mono truncate" style={{ color: 'var(--text)' }}>
+                            {detectedFunnelUrl}
+                          </p>
+                        </div>
+                        {gatewayInput.trim() !== detectedFunnelUrl && (
+                          <button
+                            type="button"
+                            onClick={handleUseDetectedFunnel}
+                            className="px-2.5 py-1 text-xs font-medium rounded border transition-colors cursor-pointer shrink-0 hover:bg-[var(--surface)] active:scale-[0.98]"
+                            style={{
+                              borderColor: 'var(--border)',
+                              color: 'var(--text)',
+                            }}
+                          >
+                            Use Funnel URL
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Input Form */}
+                    <form onSubmit={handleSaveGateway} className="space-y-3">
+                      <div>
+                        <label
+                          htmlFor="ls-gateway-url-input"
+                          className="block text-xs font-medium mb-1.5"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          Gateway URL (Public Funnel or Local Host)
+                        </label>
+                        <input
+                          id="ls-gateway-url-input"
+                          type="text"
+                          value={gatewayInput}
+                          onChange={(e) => setGatewayInput(e.target.value)}
+                          placeholder="https://narayan.tail360362.ts.net or http://127.0.0.1:8790"
+                          className="w-full h-11 sm:h-10 px-3.5 text-base sm:text-sm font-mono border transition-colors focus:outline-none focus:border-[var(--accent)]"
+                          style={{
+                            backgroundColor: 'var(--bg)',
+                            borderColor: 'var(--border)',
+                            borderRadius: 'var(--radius-sm)',
+                            color: 'var(--text)',
+                          }}
+                        />
+                        <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                          Saved to your Supabase profile and synced to your mobile phone automatically.
+                        </p>
+                      </div>
+
+                      {/* Test / Save Banner Feedback */}
+                      {gatewayTestResult && (
+                        <div
+                          className={`p-3 rounded-lg text-xs font-medium flex items-center gap-2 border ${
+                            gatewayTestResult.ok
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400'
+                          }`}
+                        >
+                          {gatewayTestResult.ok ? (
+                            <Check className="w-4 h-4 shrink-0" />
+                          ) : (
+                            <WifiOff className="w-4 h-4 shrink-0" />
+                          )}
+                          <span className="flex-1">{gatewayTestResult.message}</span>
+                        </div>
+                      )}
+
+                      {gatewaySavedBanner && !gatewayTestResult && (
+                        <div className="p-3 rounded-lg text-xs font-medium flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                          <Check className="w-4 h-4 shrink-0" />
+                          <span>Gateway preferences updated</span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                          type="submit"
+                          disabled={isSavingGateway}
+                          className="min-h-[38px] px-4 py-1.5 text-xs font-semibold rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] inline-flex items-center gap-1.5 shadow-xs"
+                          style={{
+                            backgroundColor: 'var(--accent)',
+                            color: 'var(--accent-contrast)',
+                          }}
+                        >
+                          {isSavingGateway ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Connecting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Save & Connect</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isTestingGateway}
+                          onClick={handleTestGateway}
+                          className="min-h-[38px] px-3.5 py-1.5 text-xs font-medium rounded border transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.98] inline-flex items-center gap-1.5 disabled:opacity-50"
+                          style={{
+                            borderColor: 'var(--border)',
+                            color: 'var(--text)',
+                          }}
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isTestingGateway ? 'animate-spin' : ''}`} />
+                          <span>{isTestingGateway ? 'Testing...' : 'Test Connection'}</span>
+                        </button>
+
+                        {(gatewayInput || customGatewayUrl) && (
+                          <button
+                            type="button"
+                            onClick={handleResetGateway}
+                            className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer inline-flex items-center gap-1 ml-auto"
+                            title="Reset to default local & env candidates"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Reset</span>
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+                </div>
+
+                {/* Card 2: Connected Local Models */}
+                <div
+                  className="border overflow-hidden divide-y shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  <div
+                    className="p-4 sm:p-5 flex items-center justify-between gap-3"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <div>
+                      <h3 className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                        Detected Local Models ({allModels.filter((m) => m.available).length})
+                      </h3>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        GGUF files hosted in your laptop&apos;s models directory
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => refreshGateway()}
+                      className="p-1.5 rounded hover:bg-[var(--surface-2)] transition-colors cursor-pointer text-[var(--text-muted)] hover:text-[var(--text)]"
+                      title="Refresh models list"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="p-4 sm:p-5 space-y-2" style={{ borderColor: 'var(--border)' }}>
+                    {allModels.filter((m) => m.available).length === 0 ? (
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {laptopStatus === 'offline'
+                          ? 'Connect to your gateway to view installed models.'
+                          : 'No .gguf files currently loaded. Add GGUF models into your gateway models/ folder.'}
+                      </p>
+                    ) : (
+                      allModels
+                        .filter((m) => m.available)
+                        .map((m) => (
+                          <div
+                            key={m.id}
+                            className="p-3 rounded-lg border flex items-center justify-between gap-3 text-xs"
+                            style={{
+                              backgroundColor: 'var(--surface-2)',
+                              borderColor: 'var(--border)',
+                            }}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold truncate" style={{ color: 'var(--text)' }}>
+                                  {m.name}
+                                </span>
+                                {m.isDefault && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded font-medium bg-[var(--accent)] text-[var(--accent-contrast)]">
+                                    Default
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] font-mono text-[var(--text-muted)]">
+                                {m.id} · {Math.round((m.contextSize || 16384) / 1024)}k context
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                              Ready
+                            </span>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ======================================================== */}
+            {/* TAB 3: Cloud API (Vertical, Multi-Key max 5, Minimal)   */}
             {/* ======================================================== */}
             {currentTab === 'cloud' && (
               <motion.div

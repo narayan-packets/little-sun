@@ -76,6 +76,7 @@ export function setCustomGatewayUrl(url: string): void {
   } catch {
     // ignore
   }
+  activeDirectBaseUrl = null;
 }
 
 export async function registerGatewayUrlWithServer(url: string): Promise<boolean> {
@@ -153,6 +154,83 @@ function syncBrowserFavicon(baseUrl: string, faviconVersion: number | null | und
   }
 }
 
+let lastDetectedFunnelUrl = '';
+const funnelDetectionListeners = new Set<(url: string) => void>();
+
+export function getDetectedFunnelUrl(): string {
+  return lastDetectedFunnelUrl;
+}
+
+export function getActiveDirectGatewayUrl(): string | null {
+  return activeDirectBaseUrl;
+}
+
+export function onFunnelUrlDetected(callback: (url: string) => void): () => void {
+  funnelDetectionListeners.add(callback);
+  if (lastDetectedFunnelUrl) {
+    try {
+      callback(lastDetectedFunnelUrl);
+    } catch {
+      // ignore
+    }
+  }
+  return () => {
+    funnelDetectionListeners.delete(callback);
+  };
+}
+
+export async function testGatewayUrl(url: string): Promise<{
+  ok: boolean;
+  latencyMs: number;
+  funnelUrl?: string;
+  error?: string;
+}> {
+  const clean = url.trim().replace(/\/+$/, '');
+  if (!clean) {
+    return { ok: false, latencyMs: 0, error: 'Please enter a gateway URL.' };
+  }
+  if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    return { ok: false, latencyMs: 0, error: 'URL must start with https:// or http://' };
+  }
+  const start = Date.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6500);
+  try {
+    const sep = clean.includes('?') ? '&' : '?';
+    const res = await fetch(`${clean}/health${sep}_t=${Date.now()}`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    const latencyMs = Date.now() - start;
+    if (!res.ok) {
+      return { ok: false, latencyMs, error: `Gateway returned HTTP ${res.status}` };
+    }
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      return { ok: false, latencyMs, error: 'Received HTML instead of Gateway JSON API' };
+    }
+    const data = await res.json();
+    if (data?.ok === true) {
+      const funnel = typeof data.funnelUrl === 'string' && data.funnelUrl.trim() ? data.funnelUrl.trim() : undefined;
+      if (funnel) {
+        lastDetectedFunnelUrl = funnel;
+        funnelDetectionListeners.forEach((fn) => fn(funnel));
+      }
+      return { ok: true, latencyMs, funnelUrl: funnel };
+    }
+    return { ok: false, latencyMs, error: 'Invalid response from gateway health check' };
+  } catch (err) {
+    const latencyMs = Date.now() - start;
+    const msg =
+      err instanceof DOMException && err.name === 'AbortError'
+        ? 'Connection timed out (6.5s)'
+        : 'Could not connect to gateway endpoint';
+    return { ok: false, latencyMs, error: msg };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function pingHealthEndpoint(baseUrl: string, timeoutMs = 4500): Promise<boolean> {
   if (!baseUrl) return false;
   const controller = new AbortController();
@@ -171,6 +249,13 @@ async function pingHealthEndpoint(baseUrl: string, timeoutMs = 4500): Promise<bo
     const ok = Boolean(data && data.ok === true);
     if (ok) {
       syncBrowserFavicon(baseUrl, typeof data.faviconVersion === 'number' ? data.faviconVersion : null);
+      if (typeof data.funnelUrl === 'string' && data.funnelUrl.trim()) {
+        const detected = data.funnelUrl.trim();
+        if (detected !== lastDetectedFunnelUrl) {
+          lastDetectedFunnelUrl = detected;
+          funnelDetectionListeners.forEach((fn) => fn(detected));
+        }
+      }
     }
     return ok;
   } catch {

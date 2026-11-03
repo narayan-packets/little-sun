@@ -270,6 +270,76 @@ function writeSse(res, obj) {
 
 let isChatBusy = false;
 
+/**
+ * Free, zero-API-key live web search via DuckDuckGo HTML scraping.
+ * Unblocks real-time search for both Local and Cloud modes.
+ */
+async function searchDuckDuckGoHtml(query, limit = 5) {
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) {
+    throw new Error(`DuckDuckGo returned HTTP ${res.status}`);
+  }
+  const html = await res.text();
+  const titleRegex = /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+  const snippetRegex = /<a[^>]+class="result__snippet"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+
+  const titles = [];
+  let tm;
+  while ((tm = titleRegex.exec(html)) !== null) {
+    let cleanUrl = tm[1];
+    if (cleanUrl.includes('uddg=')) {
+      const match = cleanUrl.match(/uddg=([^&]+)/);
+      if (match) {
+        cleanUrl = decodeURIComponent(match[1]);
+      }
+    }
+    const cleanTitle = tm[2]
+      .replace(/<[^>]+>/g, '')
+      .replace(/&quot;/g, '"')
+      .replace(/&#0?39;/g, "'")
+      .replace(/&#x27;/g, "'")
+      .replace(/&amp;/g, '&')
+      .trim();
+    titles.push({ title: cleanTitle, url: cleanUrl });
+  }
+
+  const snippets = [];
+  let sm;
+  while ((sm = snippetRegex.exec(html)) !== null) {
+    const cleanSnippet = sm[2]
+      .replace(/<[^>]+>/g, '')
+      .replace(/&quot;/g, '"')
+      .replace(/&#0?39;/g, "'")
+      .replace(/&#x27;/g, "'")
+      .replace(/&amp;/g, '&')
+      .trim();
+    snippets.push(cleanSnippet);
+  }
+
+  const results = [];
+  const seenUrls = new Set();
+  for (let i = 0; i < titles.length && results.length < limit; i++) {
+    const item = titles[i];
+    if (!item.url || seenUrls.has(item.url)) continue;
+    seenUrls.add(item.url);
+    results.push({
+      title: item.title,
+      snippet: snippets[i] || item.title,
+      url: item.url,
+    });
+  }
+  return results;
+}
+
 const server = http.createServer(async (req, res) => {
   applyCors(req, res);
 
@@ -352,6 +422,25 @@ const server = http.createServer(async (req, res) => {
       llm: llama.getStatus(),
       tts: { ok: ttsOk },
     });
+    return;
+  }
+
+  // Live DuckDuckGo web search endpoint for remote & mobile clients
+  if (req.method === 'GET' && pathname === '/search') {
+    const q = url.searchParams.get('q');
+    const limit = Math.min(10, Math.max(1, Number(url.searchParams.get('limit') || 5)));
+    if (!q || !q.trim()) {
+      sendJson(res, 400, { error: 'missing_query' });
+      return;
+    }
+    try {
+      const results = await searchDuckDuckGoHtml(q.trim(), limit);
+      logger.log('NET', `Search: "${q.trim()}" -> ${results.length} result(s)`);
+      sendJson(res, 200, { ok: true, results });
+    } catch (err) {
+      logger.log('ERR', `Search failed: ${err?.message || err}`);
+      sendJson(res, 502, { error: 'search_failed', message: err?.message || 'Search failed' });
+    }
     return;
   }
 

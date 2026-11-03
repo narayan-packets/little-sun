@@ -5,6 +5,7 @@ export interface UserPreferencesMeta {
   tts_voice?: string;
   tts_speed?: number;
   default_model_id?: string;
+  gateway_url?: string;
 }
 
 export interface UserSession {

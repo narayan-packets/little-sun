@@ -35,9 +35,15 @@ import {
   GatewayBusyError,
   GatewayForbiddenError,
   type GatewayModel,
+  getActiveDirectGatewayUrl,
+  getCustomGatewayUrl,
+  getDetectedFunnelUrl,
   notifyGatewayChatSwitch,
+  onFunnelUrlDetected,
   sanitizeBackendModels,
+  setCustomGatewayUrl,
   streamGatewayChat,
+  testGatewayUrl,
 } from '../lib/gateway';
 import {
   type ChatContextUsage,
@@ -70,12 +76,15 @@ import {
 
 export type LaptopUiStatus = 'offline' | 'sleeping' | 'waking' | 'ready' | 'busy';
 export type AppMode = 'local' | 'cloud';
-export type SettingsRouteSection = 'account' | 'cloud' | 'voices';
+export type SettingsRouteSection = 'account' | 'gateway' | 'cloud' | 'voices';
 
 function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | null {
   const clean = pathname.replace(/\/+$/, '').toLowerCase();
   if (clean === '/settings' || clean === '/account' || clean === '/settings/account') {
     return 'account';
+  }
+  if (clean === '/gateway' || clean === '/settings/gateway') {
+    return 'gateway';
   }
   if (clean === '/cloud' || clean === '/settings/cloud' || clean === '/api' || clean === '/settings/api') {
     return 'cloud';
@@ -87,6 +96,7 @@ function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | 
 }
 
 function getPathForSettingsSection(section: SettingsRouteSection): string {
+  if (section === 'gateway') return '/gateway';
   if (section === 'voices') return '/voices';
   if (section === 'cloud') return '/cloud';
   return '/account';
@@ -236,6 +246,11 @@ interface AppStateContextValue {
   regenerateLastReply: () => Promise<void>;
   clearFailedSendError: () => void;
   refreshGateway: () => Promise<void>;
+  customGatewayUrl: string;
+  detectedFunnelUrl: string;
+  activeGatewayEndpoint: string | null;
+  updateGatewayUrl: (url: string) => Promise<boolean>;
+  testGatewayConnection: (url: string) => Promise<{ ok: boolean; latencyMs: number; error?: string }>;
 }
 
 export interface AttachmentItem {
@@ -417,6 +432,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [composerDraft, setComposerDraft] = useState('');
   const [failedSend, setFailedSend] = useState<FailedSendState | null>(null);
 
+  const [customGatewayUrl, setCustomGatewayUrlState] = useState<string>(() => getCustomGatewayUrl());
+  const [detectedFunnelUrl, setDetectedFunnelUrl] = useState<string>(() => getDetectedFunnelUrl());
+  const [activeGatewayEndpoint, setActiveGatewayEndpoint] = useState<string | null>(() => getActiveDirectGatewayUrl());
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [settingsSection, setSettingsSectionState] = useState<SettingsRouteSection>(() => {
     if (typeof window !== 'undefined') {
@@ -447,6 +466,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pollGatewayRef = useRef<() => Promise<void>>(async () => {});
   const isStreamingRef = useRef(false);
   const latestSelectedChatRef = useRef<string | null>(null);
   const nameSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -541,6 +561,19 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     if (typeof meta.tts_speed === 'number' && meta.tts_speed >= 0.75 && meta.tts_speed <= 1.5) {
       setSavedSpeed(meta.tts_speed, false);
+    }
+    if (meta.gateway_url && typeof meta.gateway_url === 'string' && meta.gateway_url.trim()) {
+      const cur = getCustomGatewayUrl();
+      if (!cur || cur !== meta.gateway_url.trim()) {
+        setCustomGatewayUrl(meta.gateway_url.trim());
+        setCustomGatewayUrlState(meta.gateway_url.trim());
+        void checkGatewayHealth().then((ok) => {
+          if (ok) {
+            setActiveGatewayEndpoint(getActiveDirectGatewayUrl());
+            void pollGatewayRef.current();
+          }
+        });
+      }
     }
   }, []);
 
@@ -724,6 +757,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     const healthy = await checkGatewayHealth();
+    setActiveGatewayEndpoint(getActiveDirectGatewayUrl());
     if (!healthy) {
       setLaptopStatus('offline');
       return;
@@ -803,6 +837,45 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       window.removeEventListener('online', pollGateway);
     };
   }, [pollGateway]);
+
+  pollGatewayRef.current = pollGateway;
+
+  // Synchronize detected Tailscale Funnel URL from laptop gateway to Supabase user metadata
+  useEffect(() => {
+    return onFunnelUrlDetected((url) => {
+      setDetectedFunnelUrl(url);
+      if (session?.user?.id && url) {
+        const currentMeta = session.user.metadata?.gateway_url;
+        if (currentMeta !== url) {
+          void syncUserPreferences({ gateway_url: url });
+        }
+      }
+    });
+  }, [session]);
+
+  const updateGatewayUrl = useCallback(
+    async (url: string): Promise<boolean> => {
+      const clean = url.trim().replace(/\/+$/, '');
+      setCustomGatewayUrl(clean);
+      setCustomGatewayUrlState(clean);
+      if (session?.user?.id) {
+        await syncUserPreferences({ gateway_url: clean });
+      }
+      const ok = await checkGatewayHealth();
+      setActiveGatewayEndpoint(getActiveDirectGatewayUrl());
+      if (ok) {
+        await pollGateway();
+      } else {
+        setLaptopStatus('offline');
+      }
+      return ok;
+    },
+    [session, pollGateway]
+  );
+
+  const testGatewayConnection = useCallback(async (url: string) => {
+    return await testGatewayUrl(url);
+  }, []);
 
   const stopGenerating = useCallback(() => {
     if (abortControllerRef.current) {
@@ -1108,10 +1181,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
       const temporalContext = `Temporal Context: Today is ${dateStr}. Current local time is ${timeStr}.`;
 
-      // Perform free live web search if enabled (strictly for Local LLMs to protect Cloud context limits)
+      // Perform free live web search if enabled (works in both Local and Cloud modes)
       let liveWebContext = '';
       let searchSources: Array<{ title: string; url: string }> = [];
-      if (mode === 'local' && isWebSearchActive) {
+      if (isWebSearchActive) {
         const lastUser = [...cleanedHistory].reverse().find((m) => m.role === 'user');
         if (lastUser?.content) {
           try {
@@ -1120,7 +1193,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             const isExtractedTemporal = rawQuery ? isTemporalQuery(rawQuery) : false;
 
             if (!isDirectTemporal && !isExtractedTemporal && rawQuery) {
-              const results = await performWebSearch(rawQuery, 4, (sec) => setSearchCooldown(sec));
+              const results = await performWebSearch(
+                rawQuery,
+                4,
+                (sec) => setSearchCooldown(sec),
+                session?.accessToken
+              );
               if (results.length > 0) {
                 searchSources = results.slice(0, 3).map((r) => ({ title: r.title, url: r.url }));
                 liveWebContext = formatSearchResultsForPrompt(rawQuery, results);
@@ -1614,6 +1692,11 @@ Here are generated document files ready for 1-click download:
       regenerateLastReply,
       clearFailedSendError,
       refreshGateway: pollGateway,
+      customGatewayUrl,
+      detectedFunnelUrl,
+      activeGatewayEndpoint,
+      updateGatewayUrl,
+      testGatewayConnection,
     }),
     [
       session,
@@ -1665,6 +1748,11 @@ Here are generated document files ready for 1-click download:
       regenerateLastReply,
       clearFailedSendError,
       pollGateway,
+      customGatewayUrl,
+      detectedFunnelUrl,
+      activeGatewayEndpoint,
+      updateGatewayUrl,
+      testGatewayConnection,
     ]
   );
 

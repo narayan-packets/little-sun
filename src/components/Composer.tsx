@@ -586,7 +586,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                 onClick={() => setIsMenuOpen((prev) => !prev)}
                 className="h-9 w-9 sm:h-9.5 sm:w-9.5 inline-flex items-center justify-center rounded-full transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 relative"
                 style={{
-                  color: isWebSearchActive && mode === 'local' ? 'var(--accent)' : 'var(--text-muted)',
+                  color: isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)',
                   backgroundColor: isMenuOpen ? 'var(--surface-2)' : 'transparent',
                 }}
                 onMouseEnter={(e) => {
@@ -595,14 +595,14 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color =
-                    isWebSearchActive && mode === 'local' ? 'var(--accent)' : 'var(--text-muted)';
+                    isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)';
                   e.currentTarget.style.backgroundColor = isMenuOpen ? 'var(--surface-2)' : 'transparent';
                 }}
                 title="Options (Attach file, Web search)"
                 aria-label="Options"
               >
                 <MoreHorizontal className="w-4.5 h-4.5" />
-                {isWebSearchActive && mode === 'local' && (
+                {isWebSearchActive && (
                   <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface)]" />
                 )}
               </button>
@@ -652,24 +652,16 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                     {/* Item 2: Web Search */}
                     <button
                       type="button"
-                      disabled={mode === 'cloud'}
                       onClick={() => {
-                        if (mode === 'local') {
-                          toggleWebSearch();
-                        }
+                        toggleWebSearch();
                       }}
-                      className={`w-full px-3 py-2 rounded-xl flex items-center justify-between text-left transition-colors ${
-                        mode === 'cloud'
-                          ? 'opacity-50 cursor-not-allowed'
-                          : 'cursor-pointer hover:bg-[var(--surface-2)]'
-                      }`}
-                      title={mode === 'cloud' ? 'Web search is optimized for Local LLM context' : undefined}
+                      className="w-full px-3 py-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
                     >
                       <div className="flex items-center gap-2.5">
                         <Globe
                           className="w-4 h-4"
                           style={{
-                            color: isWebSearchActive && mode === 'local' ? 'var(--accent)' : 'var(--text-muted)',
+                            color: isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)',
                           }}
                         />
                         <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
@@ -677,17 +669,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                         </span>
                       </div>
 
-                      {mode === 'cloud' ? (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded font-mono"
-                          style={{
-                            backgroundColor: 'var(--surface-2)',
-                            color: 'var(--text-muted)',
-                          }}
-                        >
-                          Local only
-                        </span>
-                      ) : searchCooldown > 0 ? (
+                      {searchCooldown > 0 ? (
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
                           {searchCooldown}s
                         </span>
@@ -710,7 +692,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
             </div>
 
             {/* Active Web Search Badge or Cooldown pill placed right next to 3-dot at start of composer */}
-            {isWebSearchActive && mode === 'local' && (
+            {isWebSearchActive && (
               <div
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs"
                 style={{
