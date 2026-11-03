@@ -499,7 +499,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pollGatewayRef = useRef<() => Promise<void>>(async () => {});
+  const pollGatewayRef = useRef<() => Promise<void>>(async () => { });
   const isStreamingRef = useRef(false);
   const latestSelectedChatRef = useRef<string | null>(null);
   const nameSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

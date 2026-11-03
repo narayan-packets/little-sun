@@ -30,11 +30,15 @@ const SUGGESTION_PILLS = [
 
 function getHeroGreeting(name: string): string {
   const hour = new Date().getHours();
-  let timeStr = 'Evening';
+  let timeStr = 'Night';
   if (hour >= 5 && hour < 12) {
     timeStr = 'Morning';
   } else if (hour >= 12 && hour < 17) {
     timeStr = 'Afternoon';
+  } else if (hour >= 17 && hour < 21) {
+    timeStr = 'Evening';
+  } else {
+    timeStr = 'Night';
   }
   return name ? `${timeStr}, ${name}` : timeStr;
 }

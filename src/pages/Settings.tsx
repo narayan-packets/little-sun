@@ -357,13 +357,12 @@ export const SettingsPage: React.FC = () => {
                 borderColor: 'var(--border)',
               }}
             >
-              <a
-                href="/account"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openSettingsSection('account');
-                }}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
+              <button
+                type="button"
+                role="tab"
+                aria-selected={currentTab === 'account'}
+                onClick={() => openSettingsSection('account')}
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'account'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -378,15 +377,14 @@ export const SettingsPage: React.FC = () => {
                   style={{ color: currentTab === 'account' ? 'var(--accent)' : 'inherit' }}
                 />
                 <span>Account</span>
-              </a>
+              </button>
 
-              <a
-                href="/memory"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openSettingsSection('memory');
-                }}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
+              <button
+                type="button"
+                role="tab"
+                aria-selected={currentTab === 'memory'}
+                onClick={() => openSettingsSection('memory')}
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'memory'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -401,15 +399,14 @@ export const SettingsPage: React.FC = () => {
                   style={{ color: currentTab === 'memory' ? 'var(--accent)' : 'inherit' }}
                 />
                 <span>Memory</span>
-              </a>
+              </button>
 
-              <a
-                href="/gateway"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openSettingsSection('gateway');
-                }}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
+              <button
+                type="button"
+                role="tab"
+                aria-selected={currentTab === 'gateway'}
+                onClick={() => openSettingsSection('gateway')}
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'gateway'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -424,15 +421,14 @@ export const SettingsPage: React.FC = () => {
                   style={{ color: currentTab === 'gateway' ? 'var(--accent)' : 'inherit' }}
                 />
                 <span>Gateway</span>
-              </a>
+              </button>
 
-              <a
-                href="/cloud"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openSettingsSection('cloud');
-                }}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
+              <button
+                type="button"
+                role="tab"
+                aria-selected={currentTab === 'cloud'}
+                onClick={() => openSettingsSection('cloud')}
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'cloud'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -447,15 +443,14 @@ export const SettingsPage: React.FC = () => {
                   style={{ color: currentTab === 'cloud' ? 'var(--accent)' : 'inherit' }}
                 />
                 <span>Cloud</span>
-              </a>
+              </button>
 
-              <a
-                href="/voices"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openSettingsSection('voices');
-                }}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer no-underline whitespace-nowrap active:scale-[0.98] ${
+              <button
+                type="button"
+                role="tab"
+                aria-selected={currentTab === 'voices'}
+                onClick={() => openSettingsSection('voices')}
+                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   currentTab === 'voices'
                     ? 'shadow-xs font-semibold'
                     : 'hover:text-[var(--text)]'
@@ -470,7 +465,7 @@ export const SettingsPage: React.FC = () => {
                   style={{ color: currentTab === 'voices' ? 'var(--accent)' : 'inherit' }}
                 />
                 <span>Voices</span>
-              </a>
+              </button>
             </nav>
           </div>
 
@@ -885,10 +880,10 @@ export const SettingsPage: React.FC = () => {
 
                   {/* Endpoint Info & Config */}
                   <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
-                    <div className="flex items-center justify-between gap-2 mb-3 text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 mb-3 text-xs">
                       <span style={{ color: 'var(--text-muted)' }}>Active endpoint</span>
                       <span
-                        className="font-mono px-2 py-0.5 rounded border max-w-[200px] sm:max-w-xs truncate"
+                        className="font-mono px-2 py-1 rounded border break-all sm:break-normal text-[11px] sm:text-xs"
                         style={{
                           backgroundColor: 'var(--surface-2)',
                           borderColor: 'var(--border)',
@@ -912,7 +907,7 @@ export const SettingsPage: React.FC = () => {
                           <span className="text-[11px] font-medium text-[var(--accent)] block">
                             Funnel detected
                           </span>
-                          <span className="font-mono text-xs truncate block" style={{ color: 'var(--text)' }}>
+                          <span className="font-mono text-xs break-all sm:break-normal block" style={{ color: 'var(--text)' }}>
                             {detectedFunnelUrl}
                           </span>
                         </div>
