@@ -101,8 +101,6 @@ const envGatewayUrl = (
   .trim()
   .replace(/\/+$/, '');
 
-const FALLBACK_FUNNEL_URL = 'https://narayan.tail360362.ts.net';
-
 export function getDirectGatewayUrl(): string {
   const custom = getCustomGatewayUrl();
   if (custom && !custom.includes('<laptop>') && !custom.includes('<your-laptop>')) {
@@ -111,7 +109,7 @@ export function getDirectGatewayUrl(): string {
   if (envGatewayUrl && !envGatewayUrl.includes('<laptop>') && !envGatewayUrl.includes('<your-laptop>')) {
     return envGatewayUrl;
   }
-  return FALLBACK_FUNNEL_URL;
+  return '';
 }
 
 let activeDirectBaseUrl: string | null = null;

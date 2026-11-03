@@ -31,9 +31,10 @@
 
 # Edge proxy for Little Sun Gateway (Tailscale Funnel)
 # Proxies /gateway-proxy/* seamlessly to your live Tailscale Funnel endpoint
+# (Replace with your actual Tailscale Funnel domain or rely on direct VITE_GATEWAY_URL)
 [[redirects]]
   from = "/gateway-proxy/*"
-  to = "https://narayan.tail360362.ts.net/:splat"
+  to = "https://<your-laptop>.<your-tailnet>.ts.net/:splat"
   status = 200
   force = true
 

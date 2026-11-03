@@ -331,7 +331,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const allowedEmailsRaw = process.env.ALLOWED_EMAILS || OWNER_EMAIL || '';
+  const allowedEmailsRaw = process.env.ALLOWED_EMAILS || '';
   const allowedEmails = allowedEmailsRaw
     .split(',')
     .map((e) => e.trim().toLowerCase())

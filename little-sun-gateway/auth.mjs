@@ -62,9 +62,16 @@ export async function verifySupabaseToken(authHeader) {
       return null;
     }
 
+    const resolvedEmail =
+      typeof payload.email === 'string' && payload.email.trim()
+        ? payload.email.trim()
+        : typeof payload.user_metadata?.email === 'string' && payload.user_metadata.email.trim()
+          ? payload.user_metadata.email.trim()
+          : '';
+
     return {
       id: String(payload.sub),
-      email: typeof payload.email === 'string' ? payload.email : '',
+      email: resolvedEmail,
     };
   } catch (err) {
     logger.log('AUTH', `JWKS verification failed: ${err?.message || err}. Attempting Supabase API fallback...`);
@@ -79,9 +86,15 @@ export async function verifySupabaseToken(authHeader) {
         const userData = await userRes.json();
         if (userData?.id) {
           logger.log('AUTH', `Supabase API verified client: ${userData.email || userData.id}`);
+          const fallbackEmail =
+            typeof userData.email === 'string' && userData.email.trim()
+              ? userData.email.trim()
+              : typeof userData.user_metadata?.email === 'string' && userData.user_metadata.email.trim()
+                ? userData.user_metadata.email.trim()
+                : '';
           return {
             id: String(userData.id),
-            email: typeof userData.email === 'string' ? userData.email : '',
+            email: fallbackEmail,
           };
         }
       }

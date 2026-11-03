@@ -1,9 +1,9 @@
-# Little Sun ☀️ (v1.7)
+# Little Sun ☀️ (v2.0 Beta)
 
 > **A warm, private, editorial intelligence interface connecting to your personal local LLM, neural voice engine, and hybrid cloud providers.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version: 1.7.0](https://img.shields.io/badge/Version-1.7.0-orange.svg)]()
+[![Version: 2.0.0-beta](https://img.shields.io/badge/Version-2.0.0--beta-orange.svg)]()
 [![React 19](https://img.shields.io/badge/React-19.0-blue.svg)](https://react.dev/)
 [![Tailwind CSS 4](https://img.shields.io/badge/Tailwind-4.x-38bdf8.svg)](https://tailwindcss.com/)
 [![Vite 8](https://img.shields.io/badge/Vite-8.x-purple.svg)](https://vitejs.dev/)
@@ -16,7 +16,7 @@
 
 **Little Sun** pairs an elegant, distraction-free web client with your own laptop's local inference gateway (`little-sun-gateway`). Powered by [`llama.cpp`](https://github.com/ggerganov/llama.cpp) for sovereign GGUF intelligence and [`piper-tts`](https://github.com/rhasspy/piper) for natural neural voice streaming, your conversations, prompts, and model weights remain completely under your control.
 
-In **V1.7**, Little Sun introduces **Hybrid Intelligence**: seamless toggling between private Local Hardware LLMs and Cloud API Providers (OpenRouter, Groq, xAI Groq, Hugging Face, OpenAI, or any custom OpenAI-compatible endpoint). It also adds **Zero-API-Key Live Web Search**, **Ephemeral Document & Image Uploads with 1-hour expiration**, and an **editorial, balanced composer** optimized for desktop and mobile.
+In **V2.0 Beta**, Little Sun delivers a fully stabilized, forkable personal AI platform with **Hybrid Intelligence** (seamless toggling between private Local Hardware LLMs and Cloud API Providers), **Zero-API-Key Multi-Engine Web Search**, **Ephemeral Document & Image Uploads with 1-hour auto-expiration**, **dynamic real-time system clock routing**, and an **editorial, balanced composer** optimized for desktop and mobile.
 
 ---
 
