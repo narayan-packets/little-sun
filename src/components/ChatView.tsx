@@ -366,10 +366,10 @@ export const ChatView: React.FC = () => {
               key={activeChatId || 'active-chat-instance'}
               ref={scrollContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto px-4 sm:px-6 py-6"
+              className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-6"
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
             >
-              <div className="w-full max-w-[720px] mx-auto space-y-6">
+              <div className="w-full max-w-[720px] mx-auto space-y-4 sm:space-y-6">
                 {messages.map((msg) => (
                   <MessageItem
                     key={msg.id}

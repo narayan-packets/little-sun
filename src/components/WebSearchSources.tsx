@@ -61,7 +61,7 @@ export const WebSearchSources: React.FC<WebSearchSourcesProps> = ({ sources }) =
                   (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
-              <span className="font-medium truncate max-w-[200px] sm:max-w-[300px]">
+              <span className="font-medium truncate max-w-[140px] sm:max-w-[300px]">
                 {cleanTitle}
               </span>
               <span

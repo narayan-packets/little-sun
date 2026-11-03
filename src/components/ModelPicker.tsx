@@ -3,6 +3,16 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Check, ChevronDown, Cloud, Search, Sun, Zap } from 'lucide-react';
 import { useAppState } from '../state/store';
 
+function formatModelDisplay(name: string): string {
+  if (!name) return '';
+  // Clean redundant provider prefixes like "Qwen/Qwen3.8-27B" -> "Qwen3.8-27B"
+  if (name.includes('/') && !name.includes(' ')) {
+    const parts = name.split('/');
+    return parts[parts.length - 1];
+  }
+  return name;
+}
+
 export const ModelPicker: React.FC = () => {
   const {
     mode,
@@ -73,8 +83,8 @@ export const ModelPicker: React.FC = () => {
           <Sun className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
         )}
 
-        <span className="truncate max-w-[140px] sm:max-w-[220px]">
-          {currentModel ? currentModel.name : mode === 'cloud' ? 'Select Cloud Model' : 'Little Sun'}
+        <span className="truncate max-w-[130px] sm:max-w-[220px]">
+          {currentModel ? formatModelDisplay(currentModel.name) : mode === 'cloud' ? 'Cloud Model' : 'Little Sun'}
         </span>
 
         <ChevronDown

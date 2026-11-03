@@ -810,7 +810,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, isStreaming }) =>
             title={`Save as ${targetFilename}`}
           >
             <Download className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Save</span>
+            <span className="text-[11px] sm:text-xs">Save</span>
           </button>
         </div>
       </div>

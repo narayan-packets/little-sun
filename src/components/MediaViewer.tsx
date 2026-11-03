@@ -1005,50 +1005,72 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
       className="my-3 max-w-full sm:max-w-xl rounded-xl overflow-hidden border shadow-xs"
       style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
     >
-      {/* Header Bar */}
-      <div className="p-2 sm:p-2.5 border-b flex items-center justify-between text-xs bg-[var(--surface-2)]">
-        <div className="flex items-center gap-1.5 font-medium truncate" style={{ color: 'var(--text)' }}>
-          <Subtitles className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
-          <span className="truncate">Subtitle Track</span>
-          <span className="text-[10px] uppercase font-mono px-1 py-0.2 rounded border bg-[var(--surface)] text-[var(--text-muted)] shrink-0">
-            {ext}
-          </span>
-          {cues.length > 0 && (
-            <span className="text-[11px] text-[var(--text-muted)] shrink-0 hidden sm:inline">
-              · {cues.length} {cues.length === 1 ? 'cue' : 'cues'}
+      {/* Header Bar: Mobile-optimized 2-tier or single desktop bar */}
+      <div className="p-2 sm:p-2.5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs bg-[var(--surface-2)]">
+        {/* Title row: Icon, Subtitle Track, format badge, cue count, and on mobile the primary download button */}
+        <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Subtitles className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+            <span className="font-semibold text-xs sm:text-sm whitespace-nowrap" style={{ color: 'var(--text)' }}>
+              Subtitle Track
             </span>
-          )}
+            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border bg-[var(--surface)] text-[var(--text-muted)] shrink-0">
+              {ext}
+            </span>
+            {cues.length > 0 && (
+              <span className="text-[11px] text-[var(--text-muted)] shrink-0">
+                · {cues.length} {cues.length === 1 ? 'cue' : 'cues'}
+              </span>
+            )}
+          </div>
+
+          {/* On mobile only: primary download button in top row */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="sm:hidden h-7 px-2.5 inline-flex items-center gap-1.5 rounded font-medium border text-xs cursor-pointer active:scale-95 shrink-0"
+            style={{
+              backgroundColor: 'var(--accent)',
+              borderColor: 'var(--accent)',
+              color: 'var(--accent-contrast)',
+            }}
+            title={`Download .${ext}`}
+          >
+            <Download className="w-3 h-3" />
+            <span>.{ext}</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Action Toolbar: ViewMode, Copy, Doc, Md, and Desktop Download */}
+        <div className="flex items-center flex-wrap gap-1 sm:gap-1.5 shrink-0">
           {cues.length > 0 && (
             <button
               type="button"
               onClick={() => setViewMode((v) => (v === 'cues' ? 'raw' : 'cues'))}
-              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors active:scale-95"
               style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
               title={viewMode === 'cues' ? 'View raw subtitle code' : 'View formatted cue cards'}
             >
               {viewMode === 'cues' ? <Code className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-              <span className="hidden sm:inline">{viewMode === 'cues' ? 'Code' : 'Cues'}</span>
+              <span>{viewMode === 'cues' ? 'Code' : 'Cues'}</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={handleCopy}
-            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
-            style={{ borderColor: 'var(--border)' }}
+            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors active:scale-95"
+            style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
             title="Copy subtitle text"
           >
             {copied ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
-            <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+            <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
 
           <button
             type="button"
             onClick={handleDownloadDoc}
-            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors active:scale-95"
             style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
             title="Download dialogue as Word .doc document"
           >
@@ -1059,7 +1081,7 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
           <button
             type="button"
             onClick={handleDownloadMd}
-            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+            className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors active:scale-95"
             style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
             title="Download dialogue as Markdown .md file"
           >
@@ -1067,10 +1089,11 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
             <span>.md</span>
           </button>
 
+          {/* Desktop primary download button */}
           <button
             type="button"
             onClick={handleDownload}
-            className="h-7 px-2.5 inline-flex items-center gap-1 rounded font-medium border text-xs cursor-pointer active:scale-95"
+            className="hidden sm:inline-flex h-7 px-2.5 items-center gap-1.5 rounded font-medium border text-xs cursor-pointer active:scale-95"
             style={{
               backgroundColor: 'var(--accent)',
               borderColor: 'var(--accent)',
@@ -1090,36 +1113,46 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({ code, format = 'srt'
           className="p-2.5 sm:p-3 space-y-1.5 max-h-[300px] overflow-y-auto"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {cues.map((cue) => (
-            <div
-              key={cue.id}
-              className="p-2 sm:p-2.5 rounded-lg border transition-colors flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2.5 text-xs"
-              style={{
-                backgroundColor: 'var(--surface-2)',
-                borderColor: 'var(--border)',
-              }}
-            >
-              <div className="flex items-center gap-1.5 shrink-0 select-none">
-                <span className="text-[10px] font-mono font-medium opacity-60">#{cue.id}</span>
-                <span
-                  className="text-[10.5px] font-mono px-1.5 py-0.5 rounded border"
-                  style={{
-                    backgroundColor: 'var(--surface)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  {cue.start} → {cue.end}
-                </span>
-              </div>
+          {cues.map((cue) => {
+            const speakerMatch = cue.text.match(/^([^:\n]{1,24}):\s*(.*)$/s);
+            return (
               <div
-                className="text-[13px] leading-relaxed break-words font-medium"
-                style={{ color: 'var(--text)' }}
+                key={cue.id}
+                className="p-2 sm:p-2.5 rounded-lg border transition-colors flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2.5 text-xs"
+                style={{
+                  backgroundColor: 'var(--surface-2)',
+                  borderColor: 'var(--border)',
+                }}
               >
-                {cue.text}
+                <div className="flex items-center gap-1.5 shrink-0 select-none">
+                  <span className="text-[10px] font-mono font-medium opacity-60">#{cue.id}</span>
+                  <span
+                    className="text-[10.5px] font-mono px-1.5 py-0.5 rounded border"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    {cue.start} → {cue.end}
+                  </span>
+                </div>
+                <div
+                  className="text-[13px] leading-relaxed break-words font-medium"
+                  style={{ color: 'var(--text)' }}
+                >
+                  {speakerMatch ? (
+                    <>
+                      <span className="font-semibold text-[var(--accent)]">{speakerMatch[1]}: </span>
+                      <span>{speakerMatch[2]}</span>
+                    </>
+                  ) : (
+                    cue.text
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <pre
@@ -1203,40 +1236,59 @@ export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
       className="my-3 max-w-full sm:max-w-xl rounded-xl overflow-hidden border shadow-xs"
       style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
     >
-      <div className="p-2 sm:p-2.5 flex items-center justify-between gap-3 text-xs bg-[var(--surface-2)]">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div
-            className="p-1.5 rounded-lg bg-[var(--surface)] border shrink-0"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            {getIcon()}
-          </div>
-          <div className="min-w-0 flex-1">
+      <div className="p-2 sm:p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs bg-[var(--surface-2)]">
+        <div className="flex items-center justify-between sm:justify-start gap-2.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="text-xs font-semibold truncate"
-              style={{ color: 'var(--text)' }}
-              title={filename}
+              className="p-1.5 rounded-lg bg-[var(--surface)] border shrink-0"
+              style={{ borderColor: 'var(--border)' }}
             >
-              {filename}
+              {getIcon()}
             </div>
-            <div className="text-[10px] uppercase font-mono mt-0.5 text-[var(--text-muted)] flex items-center gap-1.5">
-              <span>{ext} Document</span>
-              {sizeLabel && <span>· {sizeLabel}</span>}
+            <div className="min-w-0 flex-1">
+              <div
+                className="text-xs font-semibold truncate"
+                style={{ color: 'var(--text)' }}
+                title={filename}
+              >
+                {filename}
+              </div>
+              <div className="text-[10px] uppercase font-mono mt-0.5 text-[var(--text-muted)] flex items-center gap-1.5">
+                <span>{ext} Document</span>
+                {sizeLabel && <span>· {sizeLabel}</span>}
+              </div>
             </div>
           </div>
+
+          {/* Primary mobile download button in top row */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="sm:hidden h-7 px-2.5 inline-flex items-center gap-1.5 rounded font-medium border text-xs cursor-pointer active:scale-95 shrink-0"
+            style={{
+              backgroundColor: 'var(--accent)',
+              borderColor: 'var(--accent)',
+              color: 'var(--accent-contrast)',
+            }}
+            title={`Download ${filename}`}
+          >
+            <Download className="w-3 h-3" />
+            <span>{downloading ? '…' : 'Save'}</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center flex-wrap gap-1 sm:gap-1.5 shrink-0">
           {hasContent && (
             <button
               type="button"
               onClick={() => setShowPreview((v) => !v)}
-              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors active:scale-95"
               style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
               title={showPreview ? 'Hide file preview' : 'View file content'}
             >
               {showPreview ? <Eye className="w-3 h-3" /> : <Code className="w-3 h-3" />}
-              <span className="hidden sm:inline">{showPreview ? 'Hide' : 'Preview'}</span>
+              <span>{showPreview ? 'Hide' : 'Preview'}</span>
             </button>
           )}
 
@@ -1244,12 +1296,12 @@ export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
             <button
               type="button"
               onClick={handleCopy}
-              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors"
+              className="h-7 px-2 inline-flex items-center gap-1 rounded border text-xs cursor-pointer hover:bg-[var(--surface)] transition-colors active:scale-95"
               style={{ borderColor: 'var(--border)' }}
               title="Copy file content"
             >
               {copied ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
-              <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+              <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
           )}
 
@@ -1257,7 +1309,7 @@ export const FileDownloadCard: React.FC<FileDownloadCardProps> = ({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="h-7 px-2.5 inline-flex items-center gap-1 rounded font-medium border text-xs cursor-pointer active:scale-95"
+            className="hidden sm:inline-flex h-7 px-2.5 items-center gap-1.5 rounded font-medium border text-xs cursor-pointer active:scale-95"
             style={{
               backgroundColor: 'var(--accent)',
               borderColor: 'var(--accent)',

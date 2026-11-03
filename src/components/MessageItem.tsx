@@ -205,7 +205,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
 
       {/* Action Row under every message */}
       <div
-        className={`mt-1 flex items-center gap-1 transition-opacity ${
+        className={`mt-1 flex flex-wrap items-center gap-1 sm:gap-1.5 transition-opacity ${
           isThisPlaying || isThisLoading || copied
             ? 'opacity-100'
             : 'opacity-100 md:opacity-65 md:group-hover:opacity-100'
@@ -215,7 +215,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
         <button
           type="button"
           onClick={handleCopy}
-          className="min-h-[38px] px-2 inline-flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer"
+          className="min-h-[34px] sm:min-h-[36px] px-2 sm:px-2.5 inline-flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer active:scale-95"
           style={{
             color: copied ? 'var(--success)' : 'var(--text-muted)',
             borderRadius: 'var(--radius-sm)',
@@ -241,7 +241,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
           <button
             type="button"
             onClick={handleDownloadMarkdown}
-            className="min-h-[38px] px-2 inline-flex items-center justify-center gap-1 text-xs transition-colors cursor-pointer active:scale-95"
+            className="min-h-[34px] sm:min-h-[36px] px-2 sm:px-2.5 inline-flex items-center justify-center gap-1 text-xs transition-colors cursor-pointer active:scale-95"
             style={{
               color: 'var(--text-muted)',
               borderRadius: 'var(--radius-sm)',
@@ -250,7 +250,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
             title="Download full response as .md file"
           >
             <Download className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">.md</span>
+            <span>.md</span>
           </button>
         )}
 
@@ -259,7 +259,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
           type="button"
           disabled={isOffline}
           onClick={handleReadAloud}
-          className="min-h-[38px] px-2.5 inline-flex items-center justify-center gap-1.5 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          className="min-h-[34px] sm:min-h-[36px] px-2 sm:px-2.5 inline-flex items-center justify-center gap-1.5 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95"
           style={{
             color: isThisPlaying || isThisLoading ? 'var(--accent)' : 'var(--text-muted)',
             backgroundColor: isThisPlaying || isThisLoading ? 'var(--surface-2)' : 'transparent',
@@ -296,7 +296,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
             type="button"
             disabled={isOffline || isStreaming}
             onClick={regenerateLastReply}
-            className="min-h-[38px] px-2 inline-flex items-center justify-center gap-1.5 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="min-h-[34px] sm:min-h-[36px] px-2 sm:px-2.5 inline-flex items-center justify-center gap-1.5 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95"
             style={{
               color: 'var(--text-muted)',
               borderRadius: 'var(--radius-sm)',
