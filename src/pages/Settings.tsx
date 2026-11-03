@@ -605,7 +605,7 @@ export const SettingsPage: React.FC = () => {
                     className="p-4 sm:p-5 flex items-center justify-between gap-3"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div
                         className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0"
                         style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent)' }}
@@ -836,7 +836,7 @@ export const SettingsPage: React.FC = () => {
                     className="p-4 sm:p-5 flex items-center justify-between gap-3"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div
                         className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0"
                         style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent)' }}
@@ -1064,46 +1064,51 @@ export const SettingsPage: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="p-3 sm:p-4 space-y-2" style={{ borderColor: 'var(--border)' }}>
-                    {allModels.filter((m) => m.available).length === 0 ? (
-                      <p className="text-xs py-2" style={{ color: 'var(--text-muted)' }}>
-                        {laptopStatus === 'offline'
-                          ? 'Connect to gateway to view installed models.'
-                          : 'No .gguf files loaded. Add GGUF models into gateway models/ folder.'}
-                      </p>
-                    ) : (
-                      allModels
-                        .filter((m) => m.available)
-                        .map((m) => (
-                          <div
-                            key={m.id}
-                            className="p-3 rounded-lg border flex items-center justify-between gap-3 text-xs"
-                            style={{
-                              backgroundColor: 'var(--surface-2)',
-                              borderColor: 'var(--border)',
-                            }}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-semibold truncate" style={{ color: 'var(--text)' }}>
-                                  {m.name}
-                                </span>
-                                {m.isDefault && (
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded font-medium bg-[var(--accent)] text-[var(--accent-contrast)]">
-                                    Default
-                                  </span>
+                  <div className="p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex flex-col gap-2 sm:gap-1.5">
+                      {allModels.filter((m) => m.available).length === 0 ? (
+                        <p className="text-xs py-2" style={{ color: 'var(--text-muted)' }}>
+                          {laptopStatus === 'offline'
+                            ? 'Connect to gateway to view installed models.'
+                            : 'No models found. Add GGUF models into gateway models/ folder.'}
+                        </p>
+                      ) : (
+                        allModels
+                          .filter((m) => m.available)
+                          .map((m) => {
+                            const isSelected = m.id === selectedModelId;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setSelectedModelId(m.id)}
+                                className="w-full min-h-[46px] sm:min-h-[42px] px-3.5 sm:px-4 py-2.5 flex items-center justify-between text-left text-sm border transition-all cursor-pointer active:scale-[0.99]"
+                                style={{
+                                  backgroundColor: isSelected ? 'var(--surface-2)' : 'var(--bg)',
+                                  borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                                  color: 'var(--text)',
+                                  borderRadius: 'var(--radius-sm)',
+                                }}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-medium truncate">{m.name}</span>
+                                  {m.isDefault && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded font-mono border bg-[var(--surface-2)] text-[var(--text-muted)] shrink-0">
+                                      Default
+                                    </span>
+                                  )}
+                                </div>
+                                {isSelected && (
+                                  <Check
+                                    className="w-4 h-4 shrink-0 ml-2"
+                                    style={{ color: 'var(--accent)' }}
+                                  />
                                 )}
-                              </div>
-                              <span className="text-[11px] font-mono text-[var(--text-muted)]">
-                                {m.id} · {Math.round((m.contextSize || 16384) / 1024)}k context
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                              Ready
-                            </span>
-                          </div>
-                        ))
-                    )}
+                              </button>
+                            );
+                          })
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -1312,29 +1317,30 @@ export const SettingsPage: React.FC = () => {
                         Available Models ({models.length})
                       </div>
 
-                      <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-0.5">
+                      <div className="flex flex-col gap-2 sm:gap-1.5 max-h-[320px] overflow-y-auto pr-0.5">
                         {models.map((m) => {
                           const isSelected = m.id === selectedModelId;
                           return (
-                            <div
+                            <button
                               key={m.id}
+                              type="button"
                               onClick={() => setSelectedModelId(m.id)}
-                              className={`p-2.5 flex items-center justify-between rounded-lg border text-xs transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'border-[var(--accent)] bg-[var(--surface-2)] font-semibold'
-                                  : 'border-[var(--border)] bg-[var(--bg)] hover:bg-[var(--surface-2)]'
-                              }`}
+                              className="w-full min-h-[46px] sm:min-h-[42px] px-3.5 sm:px-4 py-2.5 flex items-center justify-between text-left text-sm border transition-all cursor-pointer active:scale-[0.99]"
+                              style={{
+                                backgroundColor: isSelected ? 'var(--surface-2)' : 'var(--bg)',
+                                borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                                color: 'var(--text)',
+                                borderRadius: 'var(--radius-sm)',
+                              }}
                             >
-                              <div className="min-w-0 flex-1 pr-2">
-                                <div className="truncate font-medium" style={{ color: 'var(--text)' }}>
-                                  {m.name}
-                                </div>
-                                <div className="text-[10px] font-mono text-[var(--text-muted)] truncate">
-                                  {m.id}
-                                </div>
-                              </div>
-                              {isSelected && <Check className="w-4 h-4 text-[var(--accent)] shrink-0" />}
-                            </div>
+                              <span className="font-medium truncate">{m.name}</span>
+                              {isSelected && (
+                                <Check
+                                  className="w-4 h-4 shrink-0 ml-2"
+                                  style={{ color: 'var(--accent)' }}
+                                />
+                              )}
+                            </button>
                           );
                         })}
                       </div>

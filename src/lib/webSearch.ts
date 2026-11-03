@@ -222,7 +222,7 @@ export function getSearchCooldownSeconds(): number {
  */
 export async function performWebSearch(
   query: string,
-  limit = 4,
+  limit = 8,
   onRateLimit?: (seconds: number) => void,
   accessToken?: string
 ): Promise<WebSearchResult[]> {

@@ -1360,7 +1360,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             if (rawQuery && !isTemporalQuery(rawQuery)) {
               const results = await performWebSearch(
                 rawQuery,
-                5,
+                8,
                 (sec) => setSearchCooldown(sec),
                 session?.accessToken
               );
@@ -1385,9 +1385,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   }
                 }
 
-                // Show only genuinely distinct sources (1 to 3 sources, never forced to 3)
+                // Show the exact number of distinct sources found (e.g. 1, 2, 3, 5, 7, 8, etc.)
                 if (distinctSources.length > 0) {
-                  searchSources = distinctSources.slice(0, Math.min(distinctSources.length, 3));
+                  searchSources = distinctSources;
                   liveWebContext = formatSearchResultsForPrompt(rawQuery, results.slice(0, searchSources.length));
                 }
               }
