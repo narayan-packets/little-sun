@@ -28,6 +28,143 @@ export function isTemporalQuery(query: string): boolean {
 }
 
 /**
+ * Detects whether a message genuinely warrants external web search.
+ * Filters out conversational chatter, greetings, farewells, acknowledgments,
+ * math, programming tasks, and creative writing to avoid hallucinations.
+ */
+export function shouldPerformWebSearch(text: string): boolean {
+  if (!text) return false;
+  const clean = text.trim();
+  if (clean.length < 2) return false;
+
+  // 1. Clock / date questions handled by system prompt, not web search
+  if (isTemporalQuery(clean)) return false;
+
+  const lower = clean.toLowerCase();
+
+  // 2. Farewells & partings (NEVER search the web for goodbyes)
+  const farewellPattern =
+    /^(?:okay\s+|ok\s+|well\s+)?(?:bye|goodbye|cya|see you|good night|gn|catch you later|take care|have a good (?:day|night)|peace out)[\s!.]*$/i;
+  if (farewellPattern.test(lower)) return false;
+
+  // 3. Simple standalone greetings
+  const greetingPattern =
+    /^(?:hi|hello|hey|yo|howdy|sup|greetings|good\s+(?:morning|afternoon|evening|day))[\s!.,?]*$/i;
+  if (greetingPattern.test(lower)) return false;
+
+  // 4. Acknowledgments, thanks, short confirmations
+  const ackPattern =
+    /^(?:ok|okay|k|cool|nice|great|awesome|understood|got it|thanks|thank you|thx|cheers|sure|yes|no|yep|nope)[\s!.]*$/i;
+  if (ackPattern.test(lower)) return false;
+
+  // 5. Identity, small-talk, chatbot self-inquiries
+  const smallTalkPattern =
+    /^(?:who are you|what are you|what is your name|how are you|how are you doing|how's it going|what can you do|are you (?:ai|robot|real|human|stupid|smart))[\s!.,?]*$/i;
+  if (smallTalkPattern.test(lower)) return false;
+
+  // 6. Code / script / syntax requests (local model capability)
+  if (
+    /^(?:write|create|implement|give me|generate|code|show me)\s+(?:a\s+)?(?:python|javascript|typescript|c\+\+|rust|java|html|css|sql|function|script|code|component|regex|class|algorithm)/i.test(
+      lower
+    )
+  ) {
+    return false;
+  }
+
+  // 7. Math expressions & arithmetic
+  if (
+    /^[0-9+\-*/^().\s=%]+$/.test(clean) ||
+    /^(?:calculate|compute|solve|what is)\s+[0-9+\-*/^().\s]+$/i.test(lower)
+  ) {
+    return false;
+  }
+
+  // 8. Creative writing
+  if (/^(?:write|generate|tell me)\s+(?:a\s+)?(?:poem|story|haiku|joke|riddle|song|essay|pun)/i.test(lower)) {
+    return false;
+  }
+
+  // Positive triggers: explicit search directives
+  const explicitSearch = /\b(?:search|search for|google|browse|lookup|look up|check online|find out|source)\b/i.test(lower);
+  if (explicitSearch) return true;
+
+  // Real-time factual inquiry keywords: weather, news, stocks, sports, current releases, etc.
+  const realTimeFacts =
+    /\b(?:weather|forecast|temperature|rain|snow|humidity|climate|stock|price|crypto|bitcoin|btc|eth|market|score|match|game|news|latest|recent|current|today|tomorrow|yesterday|election|release date|version|specs|who won|who is)\b/i.test(
+      lower
+    );
+  if (realTimeFacts) return true;
+
+  // Questions seeking external factual answers (who, when, where, how much) with question mark
+  const factualQuestion = /^(?:what|when|where|who|why|how much|how many|is it|did|does|can you find)\b/i.test(lower);
+  if (factualQuestion && clean.includes('?')) return true;
+
+  // Short queries (<= 4 words) without positive signals should not search
+  const words = clean.split(/\s+/).length;
+  if (words <= 4) return false;
+
+  return true;
+}
+
+/**
+ * Strips verbose website branding suffixes from scraped search result titles
+ * (e.g. "Nalasopara Forecast - The Weather Channel | Weather.com" -> "Nalasopara Forecast")
+ */
+export function cleanSourceTitle(rawTitle: string, hostname?: string): string {
+  if (!rawTitle) return '';
+  let clean = rawTitle
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s*[-–—|:]\s*(?:The\s+)?(?:Weather Channel|AccuWeather|Wikipedia|YouTube|Reddit|GitHub|Twitter|X|BBC|CNN|Forbes|Bloomberg|Reuters|Yahoo|MSN|Google|Baidu).*$/i, '')
+    .trim();
+
+  if (hostname) {
+    const domainPrefix = hostname.split('.')[0];
+    if (domainPrefix && domainPrefix.length > 2) {
+      const reg = new RegExp(`\\s*[-–—|:]\\s*${domainPrefix}.*$`, 'i');
+      clean = clean.replace(reg, '').trim();
+    }
+  }
+
+  return clean || rawTitle;
+}
+
+/**
+ * Extracts contextual search query for follow-up questions
+ * (e.g. if user asks "Weekly forecast?" after discussing "Nallasopara East", produces "Weekly forecast Nallasopara East")
+ */
+export function extractContextualSearchQuery(
+  text: string,
+  history: Array<{ role: string; content: string }> = []
+): string {
+  const baseQuery = extractSearchQuery(text);
+  const words = baseQuery.split(/\s+/);
+
+  // If the query is already self-contained (>= 5 words), return it directly
+  if (words.length >= 5) {
+    return baseQuery;
+  }
+
+  // Look for prior user turns in history to find referenced locations/entities
+  const priorUserTurns = history
+    .filter((m) => m.role === 'user')
+    .slice(-3, -1); // previous 2 user messages
+
+  if (priorUserTurns.length > 0) {
+    const lastUserMsg = priorUserTurns[priorUserTurns.length - 1].content;
+    // Extract location or entity after "in", "at", "for", "about"
+    const match = lastUserMsg.match(/\b(?:in|at|for|about|of)\s+([A-Z][a-zA-Z0-9\s]+?)(?:\s+(?:tomorrow|today|yesterday|this|next|[.?!]|$))/i);
+    if (match && match[1]) {
+      const entity = match[1].trim();
+      if (!baseQuery.toLowerCase().includes(entity.toLowerCase())) {
+        return `${baseQuery} ${entity}`.trim();
+      }
+    }
+  }
+
+  return baseQuery;
+}
+
+/**
  * Extracts a concise search query from user prompt text by stripping markdown,
  * greetings, and conversational preamble.
  */
@@ -256,10 +393,9 @@ export async function performWebSearch(
  * Tightly budgeted to preserve context window tokens and avoid model overexplanation.
  */
 export function formatSearchResultsForPrompt(query: string, results: WebSearchResult[]): string {
-  if (results.length === 0) return '';
-  const trimmed = results.slice(0, 3);
-  const lines = trimmed.map(
-    (r, i) => `[Source ${i + 1}] "${r.title}": ${r.snippet.slice(0, 260)}`
+  if (!results || results.length === 0) return '';
+  const lines = results.map(
+    (r, i) => `[Source ${i + 1}] "${cleanSourceTitle(r.title)}": ${r.snippet.slice(0, 240)}`
   );
-  return `\n\n[Live Web Search Facts for "${query}"]:\n${lines.join('\n')}\n\n(Directive: Synthesize the facts above directly into your response without repeating the search query, without lecturing, and without overexplaining.)`;
+  return `\n\n[Live Web Search Facts for "${query}"]:\n${lines.join('\n')}\n\n(Directive: Synthesize the facts above directly into your response without reciting URLs, without repeating previous turn answers, and without conversational lecturing.)`;
 }

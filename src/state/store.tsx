@@ -68,11 +68,14 @@ import {
   streamCloudChat,
 } from '../lib/cloudApi';
 import {
+  cleanSourceTitle,
+  extractContextualSearchQuery,
   extractSearchQuery,
   formatSearchResultsForPrompt,
   getSearchCooldownSeconds,
   isTemporalQuery,
   performWebSearch,
+  shouldPerformWebSearch,
 } from '../lib/webSearch';
 import {
   clearAllMemoriesRows,
@@ -1260,7 +1263,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const activeList = mode === 'cloud' ? effectiveCloudModels : allModels;
       const modelMeta = activeList.find((m) => m.id === modelId) || activeList[0];
       const cleanedHistory = sanitizeMessageListForMath(
-        historyForContext.map((m) => ({ role: m.role, content: m.content }))
+        historyForContext.map((m) => {
+          // Strip previously appended "### Sources" citation lists from history so LLMs don't get trapped in repetition loops
+          const textWithoutSources = m.content.replace(/\n\n### Sources[\s\S]*$/, '').trim();
+          return { role: m.role, content: textWithoutSources };
+        })
       );
 
       const trimmedPayload = trimMessagesForContext(
@@ -1336,22 +1343,42 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       let searchSources: Array<{ title: string; url: string }> = [];
       if (isWebSearchActive) {
         const lastUser = [...cleanedHistory].reverse().find((m) => m.role === 'user');
-        if (lastUser?.content) {
+        if (lastUser?.content && shouldPerformWebSearch(lastUser.content)) {
           try {
-            const isDirectTemporal = isTemporalQuery(lastUser.content);
-            const rawQuery = extractSearchQuery(lastUser.content);
-            const isExtractedTemporal = rawQuery ? isTemporalQuery(rawQuery) : false;
-
-            if (!isDirectTemporal && !isExtractedTemporal && rawQuery) {
+            const rawQuery = extractContextualSearchQuery(lastUser.content, cleanedHistory);
+            if (rawQuery && !isTemporalQuery(rawQuery)) {
               const results = await performWebSearch(
                 rawQuery,
-                4,
+                5,
                 (sec) => setSearchCooldown(sec),
                 session?.accessToken
               );
               if (results.length > 0) {
-                searchSources = results.slice(0, 3).map((r) => ({ title: r.title, url: r.url }));
-                liveWebContext = formatSearchResultsForPrompt(rawQuery, results);
+                // Deduplicate by root hostname to avoid multiple links to the same site
+                const seenHostnames = new Set<string>();
+                const distinctSources: Array<{ title: string; url: string }> = [];
+
+                for (const r of results) {
+                  let hostname = '';
+                  try {
+                    hostname = new URL(r.url).hostname.replace(/^www\./, '');
+                  } catch {
+                    hostname = r.url;
+                  }
+                  if (!seenHostnames.has(hostname)) {
+                    seenHostnames.add(hostname);
+                    distinctSources.push({
+                      title: cleanSourceTitle(r.title, hostname),
+                      url: r.url,
+                    });
+                  }
+                }
+
+                // Show only genuinely distinct sources (1 to 3 sources, never forced to 3)
+                if (distinctSources.length > 0) {
+                  searchSources = distinctSources.slice(0, Math.min(distinctSources.length, 3));
+                  liveWebContext = formatSearchResultsForPrompt(rawQuery, results.slice(0, searchSources.length));
+                }
               }
             }
           } catch {

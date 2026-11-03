@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExternalLink, Globe } from 'lucide-react';
+import { cleanSourceTitle } from '../lib/webSearch';
 
 export interface WebSourceItem {
   title: string;
@@ -23,15 +24,19 @@ export const WebSearchSources: React.FC<WebSearchSourcesProps> = ({ sources }) =
   if (!sources || sources.length === 0) return null;
 
   return (
-    <div className="my-3.5 pt-3 border-t border-[var(--border)] select-none">
-      <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-muted)' }}>
+    <div className="my-3 pt-2.5 border-t border-[var(--border)] select-none">
+      <div
+        className="flex items-center gap-1.5 mb-2 text-[11px] font-medium tracking-wide uppercase"
+        style={{ color: 'var(--text-muted)' }}
+      >
         <Globe className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
         <span>Sources ({sources.length})</span>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5 sm:gap-2">
         {sources.map((item, idx) => {
           const domain = extractDomain(item.url);
+          const cleanTitle = cleanSourceTitle(item.title, domain);
           const faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 
           return (
@@ -40,35 +45,35 @@ export const WebSearchSources: React.FC<WebSearchSourcesProps> = ({ sources }) =
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs no-underline transition-all hover:border-[var(--accent)] hover:shadow-xs active:scale-[0.98] max-w-full"
+              className="group inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs no-underline transition-all hover:border-[var(--accent)] hover:bg-[var(--surface-2)] active:scale-[0.98] max-w-full"
               style={{
-                backgroundColor: 'var(--surface-2)',
+                backgroundColor: 'var(--surface)',
                 borderColor: 'var(--border)',
                 color: 'var(--text)',
               }}
-              title={item.title}
+              title={`${cleanTitle} — ${domain}`}
             >
               <img
                 src={faviconUrl}
                 alt=""
-                className="w-3.5 h-3.5 rounded-sm shrink-0 opacity-80 group-hover:opacity-100"
+                className="w-3.5 h-3.5 rounded-full shrink-0 opacity-80 group-hover:opacity-100"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
-              <span className="font-medium truncate max-w-[150px] sm:max-w-[220px]">
-                {item.title}
+              <span className="font-medium truncate max-w-[200px] sm:max-w-[300px]">
+                {cleanTitle}
               </span>
               <span
-                className="text-[10px] px-1 py-0.2 rounded font-mono shrink-0"
+                className="text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0"
                 style={{
-                  backgroundColor: 'var(--surface)',
+                  backgroundColor: 'var(--surface-2)',
                   color: 'var(--text-muted)',
                 }}
               >
                 {domain}
               </span>
-              <ExternalLink className="w-3 h-3 text-[var(--text-muted)] opacity-40 group-hover:opacity-100 shrink-0" />
+              <ExternalLink className="w-3 h-3 text-[var(--text-muted)] opacity-50 group-hover:opacity-100 shrink-0" />
             </a>
           );
         })}

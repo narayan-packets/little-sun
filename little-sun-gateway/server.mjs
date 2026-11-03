@@ -623,6 +623,9 @@ const server = http.createServer(async (req, res) => {
           stream: true,
           temperature: modelCfg.temperature ?? 0.7,
           max_tokens: modelCfg.maxTokens ?? 4096,
+          repeat_penalty: 1.18,
+          presence_penalty: 0.15,
+          frequency_penalty: 0.1,
         }),
         signal: upstreamAbort.signal,
       });
