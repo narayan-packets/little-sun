@@ -232,7 +232,11 @@ function applyCors(req, res) {
     }
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Authorization, Content-Type, Access-Control-Request-Private-Network'
+  );
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
 function sendJson(res, status, data) {
