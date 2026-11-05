@@ -12,9 +12,26 @@ jobs:
     steps:
       - name: Ping Supabase REST endpoint
         env:
-          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
-          curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::notice title=Supabase Keep-Alive Skipped::VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY secret is not set in GitHub repository settings. Add them under Settings -> Secrets and variables -> Actions to enable automatic 3-day keepalive pings."
+            exit 0
+          fi
+
+          CLEAN_URL="${SUPABASE_URL%/}"
+          HTTP_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
-            "${SUPABASE_URL}/rest/v1/chats?select=id&limit=1"
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${CLEAN_URL}/rest/v1/chats?select=id&limit=1" || echo "000")
+
+          echo "Supabase keepalive ping returned HTTP ${HTTP_STATUS}"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ]; then
+            echo "Supabase project is active and healthy."
+            exit 0
+          else
+            echo "::error::Ping failed with status code ${HTTP_STATUS}"
+            exit 1
+          fi
