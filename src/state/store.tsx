@@ -89,6 +89,7 @@ import {
   type MemoryItem,
   setIsMemoryEnabled as saveIsMemoryEnabled,
 } from '../lib/memory';
+import { getModelModalityInfo } from '../lib/modality';
 
 export type LaptopUiStatus = 'offline' | 'sleeping' | 'waking' | 'ready' | 'busy';
 export type AppMode = 'local' | 'cloud';
@@ -285,7 +286,7 @@ export interface AttachmentItem {
   id: string;
   name: string;
   size: number;
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'audio';
   dataUrl?: string;
   textContent?: string;
 }
@@ -1429,6 +1430,40 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             `You are Little Sun, a calm, direct, and thoughtful AI assistant. Answer questions concisely, naturally, and accurately. Never say or claim that you cannot create, save, or download files directly. You have full capability to generate downloadable text and data files directly for the user. Only create file formats that can be delivered as genuine, valid text files (.md, .doc, .txt, .csv, .json, .html, .svg, .srt, .vtt, and code files like .py, .js, .ts). Do NOT attempt impossible binary formats that cannot be produced as raw text (such as binary .pdf, .docx, .xlsx, .zip, .mp3, .mp4); instead, provide the content as a Word .doc, spreadsheet .csv, or Markdown .md document. When asked to create, save, or export any file, output the contents inside a \`\`\`file:<filename>.<ext> block (for example: \`\`\`file:README.md, \`\`\`file:Proposal.doc, \`\`\`file:notes.txt, or \`\`\`file:data.csv), which automatically renders an interactive card with 1-click Download, Copy, and Preview in the UI. When calculations, math, or equations are involved, use LaTeX ($$...$$ or $...$). When generating images or videos, provide markdown image/video links. When generating vector graphics, output clean SVG in \`\`\`svg blocks. When generating subtitles or SRT files, output standard SubRip cues inside \`\`\`srt blocks with sequential cue numbers and arrow timecodes (e.g.:\n1\n00:00:00,000 --> 00:00:02,500\nSubtitle text).\n\n${temporalContext}`;
           const fullSystemPrompt = [baseSystemPrompt, memoryContext].filter(Boolean).join('\n\n');
 
+          const modelCap = getModelModalityInfo(effectiveModel);
+
+          // Support multimodal input formatting for models that support vision (e.g. Gemma 4, Qwen-VL, GPT-4o)
+          const formattedMessages = contextualPayload.map((m) => {
+            if (m.role === 'user' && modelCap.supportsImages) {
+              const imgRegex = /!\[(.*?)\]\(((?:https?:\/\/|data:image\/)[^\s\)]+)\)/g;
+              if (imgRegex.test(m.content)) {
+                const parts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [];
+                const textOnly = m.content.replace(imgRegex, '').trim();
+                if (textOnly) {
+                  parts.push({ type: 'text', text: textOnly });
+                }
+                const matchRegex = /!\[(.*?)\]\(((?:https?:\/\/|data:image\/)[^\s\)]+)\)/g;
+                let match;
+                while ((match = matchRegex.exec(m.content)) !== null) {
+                  parts.push({
+                    type: 'image_url',
+                    image_url: { url: match[2] },
+                  });
+                }
+                if (parts.length > 0) {
+                  return {
+                    role: m.role as 'user' | 'assistant' | 'system',
+                    content: parts,
+                  };
+                }
+              }
+            }
+            return {
+              role: m.role as 'user' | 'assistant' | 'system',
+              content: m.content,
+            };
+          });
+
           await streamCloudChat({
             key: targetKey,
             modelId: effectiveModel,
@@ -1438,10 +1473,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 role: 'system',
                 content: fullSystemPrompt,
               },
-              ...contextualPayload.map((m) => ({
-                role: m.role as 'user' | 'assistant' | 'system',
-                content: m.content,
-              })),
+              ...formattedMessages,
             ],
             signal: controller.signal,
             onStatus: () => {
@@ -1645,12 +1677,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         const imgAtts = attachments.filter((a) => a.type === 'image');
         const txtAtts = attachments.filter((a) => a.type === 'text');
+        const audAtts = attachments.filter((a) => a.type === 'audio');
 
         if (imgAtts.length > 0) {
           const imgMarkdown = imgAtts
             .map((img) => `![${img.name}](${img.dataUrl || ''})`)
             .join('\n\n');
           textParts.push(imgMarkdown);
+        }
+
+        if (audAtts.length > 0) {
+          const audMarkdown = audAtts
+            .map((aud) => `[Audio: ${aud.name}](${aud.dataUrl || ''})`)
+            .join('\n\n');
+          textParts.push(audMarkdown);
         }
 
         if (txtAtts.length > 0) {

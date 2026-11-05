@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, ChevronDown, Cloud, Search, Sun, Zap } from 'lucide-react';
 import { useAppState } from '../state/store';
+import { getModelModalityInfo } from '../lib/modality';
 
 function formatModelDisplay(name: string): string {
   if (!name) return '';
@@ -204,8 +205,35 @@ export const ModelPicker: React.FC = () => {
                     >
                       {/* Vertical room for longer model names */}
                       <div className="min-w-0 flex-1 py-0.5">
-                        <div className="font-medium whitespace-normal break-words leading-snug">
-                          {model.name}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-medium whitespace-normal break-words leading-snug">
+                            {model.name}
+                          </span>
+                          {(() => {
+                            const modInfo = getModelModalityInfo(model.id, model.name);
+                            if (modInfo.modality === 'multimodal') {
+                              return (
+                                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border border-amber-500/30 text-amber-500 bg-amber-500/10 shrink-0">
+                                  Multimodal
+                                </span>
+                              );
+                            }
+                            if (modInfo.modality === 'vision') {
+                              return (
+                                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border border-sky-500/30 text-sky-500 bg-sky-500/10 shrink-0">
+                                  Vision
+                                </span>
+                              );
+                            }
+                            if (modInfo.modality === 'audio') {
+                              return (
+                                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border border-violet-500/30 text-violet-500 bg-violet-500/10 shrink-0">
+                                  Audio
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         {model.contextSize && (
                           <div className="text-[10px] opacity-60 font-mono mt-0.5">

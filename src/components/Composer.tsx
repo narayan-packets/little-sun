@@ -12,6 +12,7 @@ import {
   Plus,
   RotateCcw,
   Square,
+  Volume2,
   X,
 } from 'lucide-react';
 import { AttachmentItem, useAppState } from '../state/store';
@@ -71,6 +72,29 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const modelInfo = useMemo(() => getModelModalityInfo(selectedModelId), [selectedModelId]);
+  const [isModalityDismissed, setIsModalityDismissed] = useState(false);
+
+  // Reset modality warning dismissal if user adds or changes attachments
+  useEffect(() => {
+    setIsModalityDismissed(false);
+  }, [attachments]);
+
+  const hasImageAttachment = attachments.some((a) => a.type === 'image');
+  const hasAudioAttachment = attachments.some((a) => a.type === 'audio');
+
+  const unsupportedModalityMessage = useMemo(() => {
+    if (isModalityDismissed) return null;
+    if (hasImageAttachment && !modelInfo.supportsImages && hasAudioAttachment && !modelInfo.supportsAudio) {
+      return 'The active model does not support image or audio inputs. Switch to a multimodal model (e.g. Gemma 4, Qwen-Omni) to process these attachments.';
+    }
+    if (hasImageAttachment && !modelInfo.supportsImages) {
+      return 'The active model is text-only. Switch to a vision-capable model (e.g. Qwen-VL, Gemma 4, GPT-4o) to analyze images.';
+    }
+    if (hasAudioAttachment && !modelInfo.supportsAudio) {
+      return 'The active model does not support audio inputs. Switch to an audio-capable model (e.g. Qwen-Audio, Gemma 4, Whisper) to process voice tracks.';
+    }
+    return null;
+  }, [isModalityDismissed, hasImageAttachment, hasAudioAttachment, modelInfo]);
 
   // Close 3-dot dropdown menu on click outside
   useEffect(() => {
@@ -142,14 +166,22 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
     const mime = file.type.toLowerCase();
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
 
-    // Audio files are removed/disabled for Cloud LLMs per request
-    if (mime.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'webm', 'flac', 'aac', 'opus'].includes(ext)) {
-      setUploadError('Audio upload is currently disabled. Please attach images or text documents (< 30 MB).');
-      return null;
-    }
-
     // Ephemeral upload to Supabase Storage (1-hour expiration timestamp)
     const uploadRes = await uploadEphemeralFile(session?.user?.id || 'guest', file);
+
+    // 1. Strict type check: Audio
+    if (
+      mime.startsWith('audio/') ||
+      ['mp3', 'wav', 'ogg', 'm4a', 'webm', 'flac', 'aac', 'opus', 'weba'].includes(ext)
+    ) {
+      return {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: file.name,
+        size: file.size,
+        type: 'audio',
+        dataUrl: uploadRes.url,
+      };
+    }
 
     // 2. Strict type check: Image
     if (
@@ -217,7 +249,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
     }
 
     setUploadError(
-      `"${file.name}" is not supported. Please upload text documents or images under 30 MB.`
+      `"${file.name}" is not supported. Please upload text documents, images, or audio files under 30 MB.`
     );
     return null;
   };
@@ -308,12 +340,12 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
       }
     >
       <div className="w-full max-w-[720px] mx-auto">
-        {/* Hidden file input for Text & Image */}
+        {/* Hidden file input for Text, Images, and Audio */}
         <input
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*,text/*,.txt,.md,.json,.csv,.tsv,.py,.js,.ts,.tsx,.jsx,.html,.css,.xml,.yaml,.yml,.c,.cpp,.rs,.go,.java,.sql,.sh,.log,.srt,.vtt,.env,.toml,.pdf,.docx"
+          accept="image/*,audio/*,text/*,.txt,.md,.json,.csv,.tsv,.py,.js,.ts,.tsx,.jsx,.html,.css,.xml,.yaml,.yml,.c,.cpp,.rs,.go,.java,.sql,.sh,.log,.srt,.vtt,.env,.toml,.pdf,.docx,.mp3,.wav,.ogg,.m4a,.webm,.flac,.aac,.opus,.weba"
           className="hidden"
           onChange={handleFileInputChange}
         />
@@ -346,27 +378,37 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
           )}
         </AnimatePresence>
 
-        {/* Upload validation error notice */}
-        {uploadError && (
-          <div
-            className="mb-2 px-3 py-1.5 text-xs rounded-xl border flex items-center justify-between gap-2 shadow-xs"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--danger)',
-              color: 'var(--danger)',
-            }}
-          >
-            <span className="truncate">{uploadError}</span>
-            <button
-              type="button"
-              onClick={() => setUploadError(null)}
-              className="p-1 rounded-md hover:bg-neutral-500/10 cursor-pointer shrink-0"
-              aria-label="Dismiss error"
+        {/* Upload validation error notice (Mobile & Desktop optimized) */}
+        <AnimatePresence>
+          {uploadError && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.16 }}
+              className="mb-2 px-3.5 py-2.5 text-xs rounded-xl border flex items-start sm:items-center justify-between gap-2.5 shadow-xs"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--danger)',
+                color: 'var(--danger)',
+              }}
+              role="alert"
             >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+              <div className="flex items-start sm:items-center gap-2 min-w-0 flex-1">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0 text-[var(--danger)]" />
+                <span className="break-words leading-relaxed text-[11px] sm:text-xs">{uploadError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUploadError(null)}
+                className="p-1 rounded-md hover:bg-neutral-500/10 cursor-pointer shrink-0 min-h-[28px] min-w-[28px] flex items-center justify-center -mr-1"
+                aria-label="Dismiss error"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Context window / token limit feedback */}
         <AnimatePresence initial={false}>
@@ -562,6 +604,8 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                       alt={att.name}
                       className="w-5 h-5 rounded object-cover shrink-0"
                     />
+                  ) : att.type === 'audio' ? (
+                    <Volume2 className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
                   ) : (
                     <FileText className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
                   )}
@@ -588,20 +632,46 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
             </div>
           )}
 
-          {/* Formal Modality Feedback Notice */}
-          {attachments.some((a) => a.type === 'image') && !modelInfo.supportsImages && (
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-xl text-xs border"
-              style={{
-                backgroundColor: 'var(--surface-2)',
-                borderColor: 'var(--border)',
-                color: 'var(--text-muted)',
-              }}
-            >
-              <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="truncate">The active model is text-only. Switch to a vision-capable model to analyze images.</span>
-            </div>
-          )}
+          {/* Responsive Unsupported Modality Feedback Notification (Mobile & Desktop optimized) */}
+          <AnimatePresence>
+            {unsupportedModalityMessage && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginTop: 4, marginBottom: 8 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                className="overflow-hidden"
+              >
+                <div
+                  className="flex items-start sm:items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-xs border shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--surface-2)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)',
+                    color: 'var(--text)',
+                  }}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-start sm:items-center gap-2 min-w-0 flex-1">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 sm:mt-0" />
+                    <span className="text-[11px] sm:text-xs leading-relaxed break-words" style={{ color: 'var(--text-muted)' }}>
+                      <strong className="font-semibold text-amber-500 mr-1">Modality Notice:</strong>
+                      {unsupportedModalityMessage}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsModalityDismissed(true)}
+                    className="p-1 rounded-md hover:bg-neutral-500/15 cursor-pointer shrink-0 min-h-[26px] min-w-[26px] flex items-center justify-center -mr-1 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                    aria-label="Dismiss modality notice"
+                    title="Dismiss notice"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Main Input Row - Well-positioned icons matching composer height and width */}
           <div
