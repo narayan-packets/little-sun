@@ -401,7 +401,14 @@ export function formatMathNum(n: number): string {
 
 export function renderLatexToHtml(latex: string, displayMode: boolean): string {
   try {
-    return katex.renderToString(latex, {
+    let clean = (latex || '').trim();
+    clean = clean
+      .replace(/^\\\[|\\\]$/g, '')
+      .replace(/^\$\$|\$\$$/g, '')
+      .replace(/^\$+|\$+$/g, '')
+      .replace(/^\\\(([\s\S]*?)\\\)$/g, '$1')
+      .trim();
+    return katex.renderToString(clean, {
       displayMode,
       throwOnError: false,
       strict: false,
@@ -932,6 +939,8 @@ export const MathVisualCard: React.FC<MathVisualCardProps> = ({ code, isStreamin
     return code
       .replace(/^\\\[|\\\]$/g, '')
       .replace(/^\$\$|\$\$/g, '')
+      .replace(/^\$+|\$+$/g, '')
+      .replace(/^\\\(([\s\S]*?)\\\)$/g, '$1')
       .trim();
   }, [code]);
 

@@ -303,6 +303,89 @@ export interface AttachmentItem {
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
+const INITIAL_LOCAL_MODELS: GatewayModel[] = [
+  {
+    id: 'sun-max',
+    name: 'Sun Max',
+    available: true,
+    enabled: true,
+    isDefault: true,
+    contextSize: 16384,
+    maxTokens: 4096,
+    modalities: ['text', 'image', 'audio'],
+    supportsImages: true,
+    supportsAudio: true,
+    supportsThinking: true,
+    thinking: true,
+    supportsTools: true,
+    tools: true,
+  },
+  {
+    id: 'sun-infinity',
+    name: 'Sun Infinity',
+    available: true,
+    enabled: true,
+    isDefault: false,
+    contextSize: 16384,
+    maxTokens: 4096,
+    modalities: ['text', 'image', 'audio'],
+    supportsImages: true,
+    supportsAudio: true,
+    supportsThinking: true,
+    thinking: true,
+    supportsTools: true,
+    tools: true,
+  },
+  {
+    id: 'sun-core',
+    name: 'Sun Core',
+    available: true,
+    enabled: true,
+    isDefault: false,
+    contextSize: 16384,
+    maxTokens: 4096,
+    modalities: ['text'],
+    supportsImages: false,
+    supportsAudio: false,
+    supportsThinking: true,
+    thinking: true,
+    supportsTools: true,
+    tools: true,
+  },
+  {
+    id: 'sun-ultra',
+    name: 'Sun Ultra',
+    available: true,
+    enabled: true,
+    isDefault: false,
+    contextSize: 16384,
+    maxTokens: 4096,
+    modalities: ['text'],
+    supportsImages: false,
+    supportsAudio: false,
+    supportsThinking: true,
+    thinking: true,
+    supportsTools: true,
+    tools: true,
+  },
+  {
+    id: 'sun-light',
+    name: 'Sun Light',
+    available: true,
+    enabled: true,
+    isDefault: false,
+    contextSize: 16384,
+    maxTokens: 4096,
+    modalities: ['text'],
+    supportsImages: false,
+    supportsAudio: false,
+    supportsThinking: true,
+    thinking: true,
+    supportsTools: false,
+    tools: false,
+  },
+];
+
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<UserSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -420,7 +503,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   }, [cloudConfig]);
 
-  const [allModels, setAllModels] = useState<GatewayModel[]>([]);
+  const [allModels, setAllModels] = useState<GatewayModel[]>(INITIAL_LOCAL_MODELS);
 
   // Listed models (enabled by user)
   const models = useMemo(() => {
@@ -431,7 +514,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return enabledList.length > 0 ? enabledList : allModels;
   }, [mode, effectiveCloudModels, allModels]);
 
-  const [localSelectedModelId, setLocalSelectedModelId] = useState<string>('');
+  const [localSelectedModelId, setLocalSelectedModelId] = useState<string>('sun-max');
 
   const selectedModelId = useMemo(() => {
     if (mode === 'cloud') {
@@ -1585,7 +1668,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         let finalClean = rawAccumulated.trim();
         if (rawThinkingAccumulated.trim()) {
-          finalClean = `<think>\n${rawThinkingAccumulated.trim()}\n</think>\n\n${finalClean}`;
+          if (!finalClean.includes('<think>') && !finalClean.includes('<thought>') && !finalClean.includes('<reasoning>')) {
+            finalClean = `<think>\n${rawThinkingAccumulated.trim()}\n</think>\n\n${finalClean}`;
+          }
         }
         if (searchSources.length > 0 && !finalClean.includes('### Sources')) {
           finalClean += `\n\n### Sources\n${searchSources.map((s) => `- [${s.title}](${s.url})`).join('\n')}`;
@@ -1627,7 +1712,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         const cleanedSoFar = rawAccumulated.trim();
         const textWithThinking = rawThinkingAccumulated.trim()
-          ? `<think>\n${rawThinkingAccumulated.trim()}\n</think>\n\n${cleanedSoFar}`
+          ? (!cleanedSoFar.includes('<think>') && !cleanedSoFar.includes('<thought>') && !cleanedSoFar.includes('<reasoning>')
+              ? `<think>\n${rawThinkingAccumulated.trim()}\n</think>\n\n${cleanedSoFar}`
+              : cleanedSoFar)
           : cleanedSoFar;
 
         if (isAbort) {

@@ -22,14 +22,41 @@ interface ParsedAssistantContent {
 }
 
 function parseAssistantMessage(content: string): ParsedAssistantContent {
-  const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
-  const match = thinkRegex.exec(content);
-  if (match) {
-    const thinking = match[1].trim();
-    const answer = content.replace(thinkRegex, '').trim();
-    return { thinking, answer };
+  if (!content) return { thinking: null, answer: '' };
+
+  let text = content;
+  const thoughts: string[] = [];
+
+  // 1. Standard closed tags: <think>, <thought>, <reasoning>
+  const tagRegex = /<(?:think|thought|reasoning)>([\s\S]*?)<\/(?:think|thought|reasoning)>/gi;
+  let tagMatch: RegExpExecArray | null;
+  while ((tagMatch = tagRegex.exec(text)) !== null) {
+    if (tagMatch[1].trim()) {
+      thoughts.push(tagMatch[1].trim());
+    }
   }
-  return { thinking: null, answer: content };
+  text = text.replace(tagRegex, '').trim();
+
+  // 2. Unclosed tag: <think> without closing </think> (e.g. stopped/interrupted stream)
+  const unclosedMatch = /<(?:think|thought|reasoning)>([\s\S]*)$/i.exec(text);
+  if (unclosedMatch) {
+    if (unclosedMatch[1].trim()) {
+      thoughts.push(unclosedMatch[1].trim());
+    }
+    text = text.slice(0, unclosedMatch.index).trim();
+  }
+
+  // 3. Plaintext "Thinking Process:" block at start of message if no tags were used
+  if (thoughts.length === 0) {
+    const plainProcessMatch = /^(?:Thinking|Thought)\s+Process:\s*\n+([\s\S]*?)(?:\n\n(?=[A-Z0-9#*-])|$)/i.exec(text);
+    if (plainProcessMatch && plainProcessMatch[1].trim().length > 20) {
+      thoughts.push(plainProcessMatch[1].trim());
+      text = text.replace(plainProcessMatch[0], '').trim();
+    }
+  }
+
+  const thinking = thoughts.length > 0 ? thoughts.join('\n\n---\n\n') : null;
+  return { thinking, answer: text };
 }
 
 interface ParsedUserContent {

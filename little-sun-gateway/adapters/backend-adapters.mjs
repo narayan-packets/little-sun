@@ -126,6 +126,99 @@ export function formulateCleanSearchKeywords(text) {
 }
 
 /**
+ * Real-time streaming filter that separates <think>...</think>, <thought>...</thought>,
+ * and <reasoning>...</reasoning> blocks from normal response tokens across SSE chunk boundaries.
+ */
+export class ThinkTagStreamFilter {
+  constructor({ onToken, onThinking, thinkingEnabled = true }) {
+    this.onToken = onToken;
+    this.onThinking = onThinking;
+    this.thinkingEnabled = thinkingEnabled;
+    this.isInsideThink = false;
+    this.tagBuffer = '';
+  }
+
+  feedContent(chunk) {
+    if (!chunk || typeof chunk !== 'string') return;
+    let str = this.tagBuffer + chunk;
+    this.tagBuffer = '';
+
+    while (str.length > 0) {
+      if (!this.isInsideThink) {
+        const openIdx = str.search(/<(?:think|thought|reasoning)>/i);
+        if (openIdx === -1) {
+          const partialMatch = str.match(/<[a-z]{0,8}$/i);
+          if (partialMatch) {
+            const emitText = str.slice(0, partialMatch.index);
+            if (emitText && typeof this.onToken === 'function') {
+              this.onToken(emitText);
+            }
+            this.tagBuffer = partialMatch[0];
+            return;
+          } else {
+            if (typeof this.onToken === 'function') {
+              this.onToken(str);
+            }
+            return;
+          }
+        } else {
+          const before = str.slice(0, openIdx);
+          if (before && typeof this.onToken === 'function') {
+            this.onToken(before);
+          }
+          const tagMatch = str.slice(openIdx).match(/^<(?:think|thought|reasoning)>/i);
+          const tagLen = tagMatch ? tagMatch[0].length : 7;
+          this.isInsideThink = true;
+          str = str.slice(openIdx + tagLen);
+        }
+      } else {
+        const closeIdx = str.search(/<\/(?:think|thought|reasoning)>/i);
+        if (closeIdx === -1) {
+          const partialMatch = str.match(/<\/[a-z]{0,9}$/i);
+          if (partialMatch) {
+            const thinkText = str.slice(0, partialMatch.index);
+            if (thinkText && this.thinkingEnabled && typeof this.onThinking === 'function') {
+              this.onThinking(thinkText);
+            }
+            this.tagBuffer = partialMatch[0];
+            return;
+          } else {
+            if (this.thinkingEnabled && typeof this.onThinking === 'function') {
+              this.onThinking(str);
+            }
+            return;
+          }
+        } else {
+          const thinkText = str.slice(0, closeIdx);
+          if (thinkText && this.thinkingEnabled && typeof this.onThinking === 'function') {
+            this.onThinking(thinkText);
+          }
+          const tagMatch = str.slice(closeIdx).match(/^<\/(?:think|thought|reasoning)>/i);
+          const tagLen = tagMatch ? tagMatch[0].length : 8;
+          this.isInsideThink = false;
+          str = str.slice(closeIdx + tagLen);
+        }
+      }
+    }
+  }
+
+  flush() {
+    if (this.tagBuffer) {
+      if (this.isInsideThink) {
+        if (this.thinkingEnabled && typeof this.onThinking === 'function') {
+          this.onThinking(this.tagBuffer);
+        }
+      } else {
+        if (typeof this.onToken === 'function') {
+          this.onToken(this.tagBuffer);
+        }
+      }
+      this.tagBuffer = '';
+    }
+  }
+}
+
+/**
  * Base Backend Adapter interface.
  */
 export class BaseBackendAdapter {
@@ -366,6 +459,20 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
     let streamedTokens = '';
     const accumulatedToolCalls = [];
 
+    const thinkFilter = new ThinkTagStreamFilter({
+      onToken: (tok) => {
+        tokenCount += 1;
+        streamedTokens += tok;
+        if (typeof onToken === 'function') onToken(tok);
+      },
+      onThinking: (th) => {
+        if (thinking !== false && typeof onThinking === 'function') {
+          onThinking(th);
+        }
+      },
+      thinkingEnabled: thinking !== false,
+    });
+
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -399,9 +506,7 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
 
             const token = chunk.message?.content;
             if (typeof token === 'string' && token.length > 0) {
-              tokenCount += 1;
-              streamedTokens += token;
-              if (typeof onToken === 'function') onToken(token);
+              thinkFilter.feedContent(token);
             }
           } catch {
             // ignore malformed NDJSON line
@@ -493,9 +598,7 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
                 }
                 const tok2 = chunk2.message?.content;
                 if (typeof tok2 === 'string' && tok2.length > 0) {
-                  tokenCount += 1;
-                  streamedTokens += tok2;
-                  if (typeof onToken === 'function') onToken(tok2);
+                  thinkFilter.feedContent(tok2);
                 }
               } catch {
                 // ignore
@@ -504,6 +607,8 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
           }
         }
       }
+
+      thinkFilter.flush();
 
       // 6. Append Sources block if search was conducted and sources were found
       if (distinctRetrievedSources.length > 0 && !streamedTokens.includes('### Sources')) {
@@ -541,10 +646,12 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
     temperature = 0.7,
     chatId = null,
     signal,
+    thinking = true,
     webSearch = false,
     supportsTools = false,
     searchFn = null,
     onToken,
+    onThinking,
     onStatus,
     onError,
     onDone,
@@ -694,6 +801,20 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
     let tokenCount = 0;
     let streamedTokens = '';
 
+    const thinkFilter = new ThinkTagStreamFilter({
+      onToken: (tok) => {
+        tokenCount += 1;
+        streamedTokens += tok;
+        if (typeof onToken === 'function') onToken(tok);
+      },
+      onThinking: (th) => {
+        if (thinking !== false && typeof onThinking === 'function') {
+          onThinking(th);
+        }
+      },
+      thinkingEnabled: thinking !== false,
+    });
+
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -709,17 +830,28 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
           if (!payloadStr || payloadStr === '[DONE]') continue;
           try {
             const parsed = JSON.parse(payloadStr);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (typeof delta === 'string' && delta.length > 0) {
-              tokenCount += 1;
-              streamedTokens += delta;
-              if (typeof onToken === 'function') onToken(delta);
+            const delta = parsed.choices?.[0]?.delta;
+
+            // 1. Direct reasoning_content (emitted by llama-server for reasoning models like DeepSeek/Qwen)
+            const reasoningDelta = delta?.reasoning_content;
+            if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
+              if (thinking !== false && typeof onThinking === 'function') {
+                onThinking(reasoningDelta);
+              }
+            }
+
+            // 2. Content delta (which may also contain <think>...</think> tags)
+            const contentDelta = delta?.content;
+            if (typeof contentDelta === 'string' && contentDelta.length > 0) {
+              thinkFilter.feedContent(contentDelta);
             }
           } catch {
             // ignore malformed chunk
           }
         }
       }
+
+      thinkFilter.flush();
 
       if (distinctRetrievedSources.length > 0 && !streamedTokens.includes('### Sources')) {
         const sourcesBlock = `\n\n### Sources\n${distinctRetrievedSources.map((s) => `- [${s.title}](${s.url})`).join('\n')}`;

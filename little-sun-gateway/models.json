@@ -10,8 +10,8 @@
       "modalities": [
         "text"
       ],
-      "supportsThinking": false,
-      "thinking": false,
+      "supportsThinking": true,
+      "thinking": true,
       "supportsTools": false,
       "tools": false,
       "contextSize": 16384,
@@ -27,8 +27,8 @@
       "modalities": [
         "text"
       ],
-      "supportsThinking": false,
-      "thinking": false,
+      "supportsThinking": true,
+      "thinking": true,
       "supportsTools": true,
       "tools": true,
       "contextSize": 16384,
@@ -44,8 +44,8 @@
       "modalities": [
         "text"
       ],
-      "supportsThinking": false,
-      "thinking": false,
+      "supportsThinking": true,
+      "thinking": true,
       "supportsTools": false,
       "tools": false,
       "contextSize": 16384,

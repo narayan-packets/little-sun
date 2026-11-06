@@ -312,12 +312,19 @@ function preprocessMathMarkdown(raw: string): string {
         return `\`math-inline:${inner.trim()}\``;
       });
 
-      // Convert $ ... $ inline math (avoiding currency like $10 or $50)
+      // Convert $ ... $ inline math (distinguishing real math from currency like $10 or $50)
       seg = seg.replace(
         /(?<![\\$\d])\$(?!\s)((?:\\.|[^$\n])+?)(?<!\s)\$(?!\d)/g,
         (match, inner) => {
           const trimmed = inner.trim();
-          if (/^\d+(?:[.,]\d+)?\s/.test(trimmed)) return match;
+          // If the expression has math operators or LaTeX commands, it's definitely math!
+          const hasMathOperators = /[\\=^_{}±×÷+\-*/]/.test(trimmed) || /\\(?:times|div|pm|cdot|frac|sqrt)\b/.test(trimmed);
+          if (!hasMathOperators) {
+            // Check if it's purely a currency number: e.g. "15", "10.50", "100"
+            if (/^\d+(?:[.,]\d+)?$/.test(trimmed) || /^\d+(?:[.,]\d+)?\s+(?:dollars|usd|cents|each|per)\b/i.test(trimmed)) {
+              return match;
+            }
+          }
           return `\`math-inline:${trimmed}\``;
         }
       );
@@ -330,7 +337,8 @@ function preprocessMathMarkdown(raw: string): string {
         if (line.includes('`math-inline:')) return line;
 
         if (isStandaloneMathLine(trimmed)) {
-          return `\n\`\`\`math\n${trimmed}\n\`\`\`\n`;
+          const cleanMath = trimmed.replace(/^\\\[|\\\]$/g, '').replace(/^\$\$|\$\$$/g, '').replace(/^\$+|\$+$/g, '').trim();
+          return `\n\`\`\`math\n${cleanMath}\n\`\`\`\n`;
         }
 
         let inlineProcessed = line;

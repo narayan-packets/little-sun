@@ -672,9 +672,19 @@ const server = http.createServer(async (req, res) => {
         .map((m) => m.content)
         .join('\n\n');
 
+      const modelCfg = llama.getModelConfig(body.model);
+      const supportsTools = Boolean(modelCfg?.supportsTools ?? modelCfg?.tools ?? false);
+      const thinkingEnabled = body.thinking !== undefined ? Boolean(body.thinking) : true;
+      const webSearchEnabled = Boolean(body.webSearch);
+      const baseSystemPrompt = modelCfg?.systemPrompt || llama.systemPrompt || '';
+
       const dynamicSystemPrompt = [
+        baseSystemPrompt,
         userProvidedSystem,
         `Today's date is ${dateStr}. Local time is ${timeStr}.`,
+        thinkingEnabled
+          ? `[Thinking Mode: ENABLED]\nThink carefully, thoroughly, and step-by-step before answering. Wrap your entire internal thought process and reasoning inside <think>...</think> tags. After the closing </think> tag, output your clear and direct response.`
+          : `[Thinking Mode: DISABLED]\nProvide your answer directly and concisely without <think> tags.`,
       ].filter(Boolean).join('\n\n');
 
       // 4. Extensible Adapter Selection (Ollama or LlamaServer)
@@ -684,10 +694,6 @@ const server = http.createServer(async (req, res) => {
       });
 
       let tokenCount = 0;
-      const thinkingEnabled = body.thinking !== undefined ? Boolean(body.thinking) : true;
-      const webSearchEnabled = Boolean(body.webSearch);
-      const modelCfg = llama.getModelConfig(body.model);
-      const supportsTools = Boolean(modelCfg?.supportsTools ?? modelCfg?.tools ?? false);
 
       await adapter.streamChat({
         modelId: body.model,
