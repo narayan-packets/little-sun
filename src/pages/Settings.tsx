@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   Brain,
   Check,
-  ChevronRight,
-  Cloud,
   Eye,
   EyeOff,
   LogOut,
@@ -14,8 +12,6 @@ import {
   RotateCcw,
   Server,
   Trash2,
-  User,
-  Volume2,
   Wifi,
   WifiOff,
 } from 'lucide-react';
@@ -451,139 +447,74 @@ export const SettingsPage: React.FC = () => {
                     borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  {/* Dedicated Item 1: Voices */}
+                  {/* Item 1: Voices */}
                   <button
                     type="button"
                     onClick={() => openSettingsSection('voices')}
-                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                    className="w-full px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                        <Volume2 className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                          Voices
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] truncate">
-                          Text-to-speech voice, speaking speed & preview
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline capitalize">
-                        {voice} · {speed}x
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
-                    </div>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                      Voices
+                    </span>
+                    <span className="text-xs font-mono text-[var(--text-muted)] capitalize">
+                      {voice} · {speed}x
+                    </span>
                   </button>
 
-                  {/* Dedicated Item 2: Gateway */}
+                  {/* Item 2: Gateway */}
                   <button
                     type="button"
                     onClick={() => openSettingsSection('gateway')}
-                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                    className="w-full px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                        <Server className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                          Gateway
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] truncate">
-                          Local models, Tailscale Funnel & connection status
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline capitalize">
-                        {laptopStatus}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
-                    </div>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                      Gateway
+                    </span>
+                    <span className="text-xs font-mono text-[var(--text-muted)] capitalize">
+                      {laptopStatus}
+                    </span>
                   </button>
 
-                  {/* Dedicated Item 3: Cloud API */}
+                  {/* Item 3: Cloud API */}
                   <button
                     type="button"
                     onClick={() => openSettingsSection('cloud')}
-                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                    className="w-full px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-sky-500/10 text-sky-500 border border-sky-500/20">
-                        <Cloud className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                          Cloud API
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] truncate">
-                          BYOK provider keys (OpenRouter, Groq, Ollama, OpenAI)
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline">
-                        {cloudConfig.keys.length} key{cloudConfig.keys.length === 1 ? '' : 's'}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
-                    </div>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                      Cloud API
+                    </span>
+                    <span className="text-xs font-mono text-[var(--text-muted)]">
+                      {cloudConfig.keys.length} key{cloudConfig.keys.length === 1 ? '' : 's'}
+                    </span>
                   </button>
 
-                  {/* Dedicated Item 4: Memory */}
+                  {/* Item 4: Memory */}
                   <button
                     type="button"
                     onClick={() => openSettingsSection('memory')}
-                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                    className="w-full px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-violet-500/10 text-violet-500 border border-violet-500/20">
-                        <Brain className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                          Memory
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] truncate">
-                          Manage persistent facts and autonomous memory retention
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline">
-                        {isMemoryEnabled ? 'ON' : 'OFF'}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
-                    </div>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                      Memory
+                    </span>
+                    <span className="text-xs font-mono text-[var(--text-muted)]">
+                      {isMemoryEnabled ? 'ON' : 'OFF'}
+                    </span>
                   </button>
 
-                  {/* Dedicated Item 5: Account */}
+                  {/* Item 5: Account */}
                   <button
                     type="button"
                     onClick={() => openSettingsSection('account')}
-                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                    className="w-full px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                        <User className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                          Account
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] truncate">
-                          Profile name and authentication details
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline">
-                        {userDisplayName}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
-                    </div>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                      Account
+                    </span>
+                    <span className="text-xs font-mono text-[var(--text-muted)] truncate max-w-[140px] text-right">
+                      {userDisplayName}
+                    </span>
                   </button>
                 </div>
               </motion.div>
