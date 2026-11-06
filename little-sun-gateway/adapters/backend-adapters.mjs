@@ -78,7 +78,9 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
     dynamicSystemPrompt = '',
     temperature = 0.7,
     signal,
+    thinking = true,
     onToken,
+    onThinking,
     onStatus,
     onError,
     onDone,
@@ -223,6 +225,14 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
               if (typeof onError === 'function') onError(chunk.error);
               return;
             }
+            // Stream reasoning trace when model supports thinking and thinking is enabled
+            const thinkingChunk = chunk.message?.thinking;
+            if (typeof thinkingChunk === 'string' && thinkingChunk.length > 0) {
+              if (thinking !== false && typeof onThinking === 'function') {
+                onThinking(thinkingChunk);
+              }
+            }
+
             const token = chunk.message?.content;
             if (typeof token === 'string' && token.length > 0) {
               tokenCount += 1;

@@ -253,6 +253,10 @@ interface AppStateContextValue {
   searchCooldown: number;
   toggleWebSearch: () => void;
   setIsWebSearchActive: (val: boolean | ((prev: boolean) => boolean)) => void;
+  isThinkingActive: boolean;
+  toggleThinking: () => void;
+  setIsThinkingActive: (val: boolean | ((prev: boolean) => boolean)) => void;
+  streamingThinking: string;
   setIsShortcutsOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setComposerDraft: (text: string) => void;
   setSelectedModelId: (modelId: string) => void;
@@ -495,6 +499,28 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isWebSearchActive, setIsWebSearchActive] = useState<boolean>(false);
   const [searchCooldown, setSearchCooldown] = useState<number>(() => getSearchCooldownSeconds());
+
+  const [isThinkingActive, setIsThinkingActive] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('littlesun_thinking_v1');
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+  const [streamingThinking, setStreamingThinking] = useState<string>('');
+
+  const toggleThinking = useCallback(() => {
+    setIsThinkingActive((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('littlesun_thinking_v1', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (searchCooldown <= 0) return;
@@ -1012,6 +1038,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       stopGenerating();
       ttsController.stop();
       setStreamingContent('');
+      setStreamingThinking('');
       latestSelectedChatRef.current = chatId;
       setActiveChatId(chatId);
       setMessages([]);
@@ -1054,6 +1081,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     stopGenerating();
     ttsController.stop();
     setStreamingContent('');
+    setStreamingThinking('');
     latestSelectedChatRef.current = null;
     setActiveChatId(null);
     setMessages([]);
@@ -1165,6 +1193,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         stopGenerating();
         ttsController.stop();
         setStreamingContent('');
+        setStreamingThinking('');
         setActiveChatId(null);
         setMessages([]);
         setFailedSend(null);
@@ -1179,6 +1208,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         stopGenerating();
         ttsController.stop();
         setStreamingContent('');
+        setStreamingThinking('');
         setActiveChatId(matched.id);
         setFailedSend(null);
         void notifyGatewayChatSwitch(session.accessToken, matched.id, 'sleep');
@@ -1430,8 +1460,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setIsStreaming(true);
       setStreamingStage('generating');
       setStreamingContent('');
+      setStreamingThinking('');
 
       let rawAccumulated = '';
+      let rawThinkingAccumulated = '';
       let streamError: string | null = null;
 
       try {
@@ -1516,6 +1548,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               url: a.dataUrl || '',
               storagePath: a.storagePath,
             })),
+            thinking: isThinkingActive,
             signal: controller.signal,
             onEvent: (evt) => {
               if (evt.type === 'status') {
@@ -1526,6 +1559,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   setStreamingStage('generating');
                   setLaptopStatus('ready');
                 }
+              } else if (evt.type === 'thinking') {
+                setStreamingStage('generating');
+                setLaptopStatus('ready');
+                rawThinkingAccumulated += evt.text;
+                setStreamingThinking(rawThinkingAccumulated);
               } else if (evt.type === 'token') {
                 setStreamingStage('generating');
                 setLaptopStatus('ready');
@@ -1539,6 +1577,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
 
         let finalClean = rawAccumulated.trim();
+        if (rawThinkingAccumulated.trim()) {
+          finalClean = `<think>\n${rawThinkingAccumulated.trim()}\n</think>\n\n${finalClean}`;
+        }
         if (searchSources.length > 0 && !finalClean.includes('### Sources')) {
           finalClean += `\n\n### Sources\n${searchSources.map((s) => `- [${s.title}](${s.url})`).join('\n')}`;
         }
@@ -1559,6 +1600,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setIsStreaming(false);
           setStreamingStage('idle');
           setStreamingContent('');
+          setStreamingThinking('');
           setMessages((prev) => [...prev, savedAssistant]);
 
           const updatedChat = await touchChatRow(session.user.id, chatId, { model_id: modelId });
@@ -1577,9 +1619,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           (err instanceof DOMException && err.name === 'AbortError');
 
         const cleanedSoFar = rawAccumulated.trim();
+        const textWithThinking = rawThinkingAccumulated.trim()
+          ? `<think>\n${rawThinkingAccumulated.trim()}\n</think>\n\n${cleanedSoFar}`
+          : cleanedSoFar;
 
         if (isAbort) {
-          const stoppedText = cleanedSoFar ? cleanedSoFar : '(Stopped)';
+          const stoppedText = textWithThinking ? textWithThinking : '(Stopped)';
           const savedStopped = await insertMessageRow({
             chatId,
             userId: session.user.id,
@@ -1592,6 +1637,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setIsStreaming(false);
           setStreamingStage('idle');
           setStreamingContent('');
+          setStreamingThinking('');
           setMessages((prev) => [...prev, savedStopped]);
           if (mode === 'local') setLaptopStatus('ready');
         } else if (err instanceof GatewayForbiddenError) {
@@ -1603,12 +1649,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             error: 'Little Sun is busy, try again in a moment',
           });
         } else {
-          if (cleanedSoFar) {
+          if (textWithThinking) {
             const savedErr = await insertMessageRow({
               chatId,
               userId: session.user.id,
               role: 'assistant',
-              content: cleanedSoFar,
+              content: textWithThinking,
               status: 'error',
               modelId,
             });
@@ -1616,6 +1662,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             setIsStreaming(false);
             setStreamingStage('idle');
             setStreamingContent('');
+            setStreamingThinking('');
             setMessages((prev) => [...prev, savedErr]);
           } else {
             const message = err instanceof Error ? err.message : 'Connection failed.';
@@ -1637,6 +1684,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setIsStreaming(false);
         setStreamingStage('idle');
         setStreamingContent('');
+        setStreamingThinking('');
       }
     },
     [
@@ -1944,6 +1992,10 @@ Here are generated document files ready for 1-click download:
       searchCooldown,
       toggleWebSearch,
       setIsWebSearchActive,
+      isThinkingActive,
+      toggleThinking,
+      setIsThinkingActive,
+      streamingThinking,
       setIsShortcutsOpen,
       setComposerDraft,
       setSelectedModelId,
@@ -2011,6 +2063,9 @@ Here are generated document files ready for 1-click download:
       isWebSearchActive,
       searchCooldown,
       toggleWebSearch,
+      isThinkingActive,
+      toggleThinking,
+      streamingThinking,
       setIsShortcutsOpen,
       toggleDesktopSidebar,
       setIsSettingsOpen,

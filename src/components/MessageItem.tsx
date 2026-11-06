@@ -13,7 +13,24 @@ import { useAppState } from '../state/store';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { SunMark } from './SunMark';
 import { ImageCard, AudioCard } from './MediaViewer';
+import { ThinkingBlock } from './ThinkingBlock';
 import { FileText } from 'lucide-react';
+
+interface ParsedAssistantContent {
+  thinking: string | null;
+  answer: string;
+}
+
+function parseAssistantMessage(content: string): ParsedAssistantContent {
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+  const match = thinkRegex.exec(content);
+  if (match) {
+    const thinking = match[1].trim();
+    const answer = content.replace(thinkRegex, '').trim();
+    return { thinking, answer };
+  }
+  return { thinking: null, answer: content };
+}
 
 interface ParsedUserContent {
   promptText: string;
@@ -185,8 +202,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
       ? typeof navigator !== 'undefined' && !navigator.onLine
       : isLocalOffline;
 
+  const { thinking, answer } = useMemo(
+    () => (isUser ? { thinking: null, answer: message.content } : parseAssistantMessage(message.content)),
+    [isUser, message.content]
+  );
+
   const handleCopy = async () => {
-    const ok = await copyTextToClipboard(message.content);
+    const ok = await copyTextToClipboard(answer || message.content);
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
@@ -197,7 +219,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
     if (isLocalOffline || !session) return;
     ttsController.toggleMessage({
       messageId: message.id,
-      markdown: message.content,
+      markdown: answer || message.content,
       accessToken: session.accessToken,
     });
   };
@@ -210,7 +232,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLastAssista
         <UserMessageContent content={message.content} />
       ) : (
         <div className="w-full max-w-full min-w-0 ls-markdown">
-          <MarkdownRenderer content={message.content} />
+          {thinking && <ThinkingBlock thinkingContent={thinking} />}
+          <MarkdownRenderer content={answer} />
 
           {message.status === 'stopped' && (
             <div className="mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>

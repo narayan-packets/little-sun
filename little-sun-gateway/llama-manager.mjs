@@ -245,7 +245,39 @@ export class LlamaManager {
       logger.log('LLM', `Auto-discovered GGUF model on disk: ${relPath} -> "${defaultAlias}"`);
     }
 
-    // 3. Ensure cfg.default points to an available model on disk
+    // 3. Auto-link multimodal projectors (mmproj) for any model matching filename patterns
+    try {
+      if (fs.existsSync(this.modelsDir)) {
+        const allFiles = fs.readdirSync(this.modelsDir, { withFileTypes: true });
+        const projectorFiles = allFiles
+          .filter((e) => e.isFile() && e.name.toLowerCase().includes('mmproj') && e.name.toLowerCase().endsWith('.gguf'))
+          .map((e) => `models/${e.name}`);
+
+        for (const m of cfg.models) {
+          if (!m.mmproj && m.file) {
+            const baseFileName = path.basename(m.file, path.extname(m.file)).toLowerCase();
+            const match = projectorFiles.find((p) => {
+              const pLower = path.basename(p).toLowerCase();
+              if (baseFileName.includes('e4b') && pLower.includes('e4b')) return true;
+              if (baseFileName.includes('e2b') && pLower.includes('e2b')) return true;
+              if (baseFileName.includes('qwen2') && pLower.includes('qwen2')) return true;
+              if (baseFileName.includes('llava') && pLower.includes('llava')) return true;
+              if (baseFileName.includes('minicpm') && pLower.includes('minicpm')) return true;
+              return false;
+            });
+            if (match) {
+              m.mmproj = match;
+              needsWrite = true;
+              logger.log('LLM', `Auto-linked multimodal projector for ${m.name}: ${match}`);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore projector scan error
+    }
+
+    // 4. Ensure cfg.default points to an available model on disk
     const availableModels = cfg.models.filter(
       (m) => m.enabled !== false && typeof m.file === 'string' && this.isFileOnDisk(m.file)
     );
@@ -305,9 +337,14 @@ export class LlamaManager {
     return validModels.map((m, idx) => {
       const available = this.isFileOnDisk(m.file);
       const id = m.id || `model-${idx + 1}`;
-      const modalities = Array.isArray(m.modalities) ? m.modalities : (m.modality ? [m.modality] : ['text']);
+      const modalities = Array.isArray(m.modalities) ? [...m.modalities] : (m.modality ? [m.modality] : ['text']);
+      const hasMmproj = Boolean(m.mmproj && this.isFileOnDisk(m.mmproj));
+      if (hasMmproj && !modalities.includes('image')) {
+        modalities.push('image');
+      }
       const supportsImages = modalities.includes('image') || modalities.includes('vision');
       const supportsAudio = modalities.includes('audio');
+      const supportsThinking = Boolean(m.supportsThinking ?? m.thinking ?? false);
       return {
         id,
         name: (typeof m.name === 'string' && m.name.trim()) || `Model ${idx + 1}`,
@@ -319,6 +356,9 @@ export class LlamaManager {
         modalities,
         supportsImages,
         supportsAudio,
+        supportsThinking,
+        thinking: supportsThinking,
+        hasProjector: hasMmproj,
       };
     });
   }

@@ -684,6 +684,7 @@ const server = http.createServer(async (req, res) => {
       });
 
       let tokenCount = 0;
+      const thinkingEnabled = body.thinking !== undefined ? Boolean(body.thinking) : true;
       await adapter.streamChat({
         modelId: body.model,
         sanitizedMessages,
@@ -691,9 +692,15 @@ const server = http.createServer(async (req, res) => {
         dynamicSystemPrompt,
         temperature: body.temperature ?? 0.7,
         chatId,
+        thinking: thinkingEnabled,
         signal: upstreamAbort.signal,
         onStatus: (state) => {
           if (!clientClosed) writeSse(res, { type: 'status', state });
+        },
+        onThinking: (tok) => {
+          if (!clientClosed) {
+            writeSse(res, { type: 'thinking', text: tok });
+          }
         },
         onToken: (tok) => {
           if (!clientClosed) {

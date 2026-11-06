@@ -56,6 +56,8 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
     isWebSearchActive,
     searchCooldown,
     toggleWebSearch,
+    isThinkingActive,
+    toggleThinking,
     sendMessage,
     stopGenerating,
     startNewChat,
@@ -73,6 +75,9 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const activeModel = models.find((m) => m.id === selectedModelId);
+  const supportsThinking = Boolean(
+    activeModel?.supportsThinking ?? activeModel?.thinking ?? false
+  );
   const modelInfo = useMemo(
     () => getModelModalityInfo(selectedModelId, activeModel?.name, activeModel),
     [selectedModelId, activeModel]
@@ -721,7 +726,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                   aria-label="Options"
                 >
                   <MoreVertical className="w-4 h-4" />
-                  {isWebSearchActive && (
+                  {(isWebSearchActive || (supportsThinking && isThinkingActive)) && (
                     <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface)]" />
                   )}
                 </button>
@@ -805,6 +810,43 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                           </span>
                         )}
                       </button>
+
+                      {/* Item 3: Thinking Mode (for supported models) */}
+                      {supportsThinking && (
+                        <>
+                          <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toggleThinking();
+                            }}
+                            className="w-full px-3 py-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <Brain
+                                className="w-4 h-4"
+                                style={{
+                                  color: isThinkingActive ? 'var(--accent)' : 'var(--text-muted)',
+                                }}
+                              />
+                              <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
+                                Thinking
+                              </span>
+                            </div>
+
+                            <span
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors"
+                              style={{
+                                backgroundColor: isThinkingActive ? 'var(--accent)' : 'var(--surface-2)',
+                                borderColor: isThinkingActive ? 'var(--accent)' : 'var(--border)',
+                                color: isThinkingActive ? 'var(--accent-contrast)' : 'var(--text-muted)',
+                              }}
+                            >
+                              {isThinkingActive ? 'ON' : 'OFF'}
+                            </span>
+                          </button>
+                        </>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -843,6 +885,30 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                     </button>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* Active Thinking Badge centered right after 3-dot menu / search badge */}
+            {mode === 'local' && supportsThinking && isThinkingActive && (
+              <div
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
+                style={{
+                  backgroundColor: 'var(--surface-2)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text)',
+                }}
+              >
+                <Brain className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                <span className="text-[11px] hidden sm:inline">Thinking</span>
+                <button
+                  type="button"
+                  onClick={toggleThinking}
+                  className="ml-0.5 p-0.5 rounded-full hover:bg-neutral-500/15 cursor-pointer"
+                  title="Disable thinking mode"
+                  aria-label="Disable thinking mode"
+                >
+                  <X className="w-3 h-3 text-[var(--text-muted)]" />
+                </button>
               </div>
             )}
 

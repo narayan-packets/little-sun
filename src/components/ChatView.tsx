@@ -18,6 +18,7 @@ import { ModelPicker } from './ModelPicker';
 import { StatusPill } from './StatusPill';
 import { SunMark } from './SunMark';
 import { CloudMark } from './CloudMark';
+import { ThinkingBlock } from './ThinkingBlock';
 
 const SUGGESTION_PILLS = [
   { label: 'Write', icon: PenLine, prompt: 'Write a ' },
@@ -53,6 +54,7 @@ export const ChatView: React.FC = () => {
     isStreaming,
     streamingStage,
     streamingContent,
+    streamingThinking,
     isDesktopSidebarCollapsed,
     setIsSidebarOpen,
     toggleDesktopSidebar,
@@ -126,7 +128,7 @@ export const ChatView: React.FC = () => {
         cancelAnimationFrame(scrollRafRef.current);
       }
     };
-  }, [messages.length, streamingContent, streamingStage, isStreaming, userScrolledUp]);
+  }, [messages.length, streamingContent, streamingThinking, streamingStage, isStreaming, userScrolledUp]);
 
   let lastAssistantId: string | null = null;
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -378,35 +380,45 @@ export const ChatView: React.FC = () => {
 
                 {/* Streaming Assistant Message */}
                 {isStreaming && (
-                  <div className="w-full flex flex-col items-start">
+                  <div className="w-full flex flex-col items-start gap-1">
+                    {/* Live streaming thinking process */}
+                    {streamingThinking && (
+                      <ThinkingBlock
+                        thinkingContent={streamingThinking}
+                        isLiveStreaming={!streamingContent}
+                      />
+                    )}
+
                     {streamingContent ? (
                       <div className="w-full max-w-full min-w-0 ls-markdown">
                         <MarkdownRenderer content={streamingContent} isStreaming />
                       </div>
                     ) : (
-                      <div
-                        className="inline-flex items-center gap-2 py-1.5 px-3 rounded-full border shadow-2xs select-none"
-                        style={{
-                          backgroundColor: 'var(--surface)',
-                          borderColor: 'var(--border)',
-                        }}
-                      >
-                        {mode === 'cloud' ? (
-                          <>
-                            <CloudMark size={16} state="generating" animated />
-                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                              Generating…
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <SunMark size={16} state="waking" animated />
-                            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                              {streamingStage === 'loading_model' ? 'Waking model…' : 'Thinking…'}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                      !streamingThinking && (
+                        <div
+                          className="inline-flex items-center gap-2 py-1.5 px-3 rounded-full border shadow-2xs select-none"
+                          style={{
+                            backgroundColor: 'var(--surface)',
+                            borderColor: 'var(--border)',
+                          }}
+                        >
+                          {mode === 'cloud' ? (
+                            <>
+                              <CloudMark size={16} state="generating" animated />
+                              <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                                Generating…
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <SunMark size={16} state="waking" animated />
+                              <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                                {streamingStage === 'loading_model' ? 'Waking model…' : 'Thinking…'}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )
                     )}
                   </div>
                 )}

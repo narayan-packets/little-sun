@@ -10,6 +10,8 @@
       "modalities": [
         "text"
       ],
+      "supportsThinking": false,
+      "thinking": false,
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
@@ -23,6 +25,8 @@
       "modalities": [
         "text"
       ],
+      "supportsThinking": false,
+      "thinking": false,
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
@@ -36,6 +40,8 @@
       "modalities": [
         "text"
       ],
+      "supportsThinking": false,
+      "thinking": false,
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
@@ -52,6 +58,8 @@
         "image",
         "audio"
       ],
+      "supportsThinking": true,
+      "thinking": true,
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
@@ -68,6 +76,8 @@
         "image",
         "audio"
       ],
+      "supportsThinking": true,
+      "thinking": true,
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
@@ -81,26 +91,8 @@
       "modalities": [
         "audio"
       ],
-      "contextSize": 16384,
-      "threads": 4,
-      "temperature": 0.7,
-      "maxTokens": 4096
-    },
-    {
-      "id": "model-7",
-      "name": "Model 7",
-      "file": "models/mmproj-gemma-4-E4B.gguf",
-      "enabled": true,
-      "contextSize": 16384,
-      "threads": 4,
-      "temperature": 0.7,
-      "maxTokens": 4096
-    },
-    {
-      "id": "model-8",
-      "name": "Model 8",
-      "file": "models/mmproj-gemma-4-E2B.gguf",
-      "enabled": true,
+      "supportsThinking": false,
+      "thinking": false,
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
