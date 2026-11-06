@@ -699,6 +699,68 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
             )}
           </AnimatePresence>
 
+          {/* Mobile Active Tools Chip Row (Compact pill strip above input on mobile screens so textarea gets 100% full width) */}
+          {mode === 'local' && (isWebSearchActive || (supportsThinking && isThinkingActive)) && (
+            <div className="flex sm:hidden items-center gap-1.5 px-0.5 pb-1.5 overflow-x-auto select-none">
+              {isWebSearchActive && (
+                <div
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 shadow-2xs"
+                  style={{
+                    backgroundColor: 'var(--surface-2)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)',
+                  }}
+                >
+                  {searchCooldown > 0 ? (
+                    <>
+                      <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span className="text-[11px] font-mono text-[var(--text-muted)]">
+                        {searchCooldown}s
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                      <span className="text-[11px]">Search</span>
+                      <button
+                        type="button"
+                        onClick={toggleWebSearch}
+                        className="ml-0.5 p-0.5 rounded-full hover:bg-neutral-500/20 active:scale-95 cursor-pointer"
+                        title="Disable web search"
+                        aria-label="Disable web search"
+                      >
+                        <X className="w-3 h-3 text-[var(--text-muted)]" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {supportsThinking && isThinkingActive && (
+                <div
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 shadow-2xs"
+                  style={{
+                    backgroundColor: 'var(--surface-2)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)',
+                  }}
+                >
+                  <Brain className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                  <span className="text-[11px]">Thinking</span>
+                  <button
+                    type="button"
+                    onClick={toggleThinking}
+                    className="ml-0.5 p-0.5 rounded-full hover:bg-neutral-500/20 active:scale-95 cursor-pointer"
+                    title="Disable thinking mode"
+                    aria-label="Disable thinking mode"
+                  >
+                    <X className="w-3 h-3 text-[var(--text-muted)]" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Main Input Row - Well-positioned icons matching composer height and width */}
           <div className="flex items-center gap-1.5 sm:gap-2 w-full">
             {/* 3-Dot Options Dropdown (Attach File & Web Search - Local Mode only) */}
@@ -853,10 +915,10 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
               </div>
             )}
 
-            {/* Active Web Search Badge centered right after 3-dot menu */}
+            {/* Active Web Search Badge centered right after 3-dot menu (Desktop view) */}
             {mode === 'local' && isWebSearchActive && (
               <div
-                className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
+                className="hidden sm:inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
                 style={{
                   backgroundColor: 'var(--surface-2)',
                   borderColor: 'var(--border)',
@@ -888,10 +950,10 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
               </div>
             )}
 
-            {/* Active Thinking Badge centered right after 3-dot menu / search badge */}
+            {/* Active Thinking Badge centered right after 3-dot menu / search badge (Desktop view) */}
             {mode === 'local' && supportsThinking && isThinkingActive && (
               <div
-                className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
+                className="hidden sm:inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
                 style={{
                   backgroundColor: 'var(--surface-2)',
                   borderColor: 'var(--border)',
