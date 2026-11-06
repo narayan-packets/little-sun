@@ -1214,16 +1214,20 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
         a({ href, children }) {
           if (!href) return <a>{children}</a>;
           const isVid = /\.(mp4|webm|mov)(\?.*)?$/i.test(href);
-          const isAudio = /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i.test(href);
           const isImg = /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(href);
           const isDoc = /\.(docx?|pdf|csv|xlsx?|txt|rtf|srt|vtt|zip)(\?.*)?$/i.test(href);
           const textLabel = extractNodeText(children);
+          const isAudio =
+            /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i.test(href) ||
+            /^data:audio\//i.test(href) ||
+            textLabel.toLowerCase().startsWith('audio:');
 
           if (isVid) {
             return <VideoCard src={href} title={textLabel || 'Video'} />;
           }
           if (isAudio) {
-            return <AudioCard src={href} title={textLabel || 'Audio Track'} />;
+            const cleanTitle = textLabel.replace(/^audio:\s*/i, '').trim() || 'Audio Track';
+            return <AudioCard src={href} title={cleanTitle} />;
           }
           if (isImg) {
             return <ImageCard src={href} alt={textLabel || 'Image'} />;

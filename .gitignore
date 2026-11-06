@@ -27,6 +27,7 @@ little-sun-gateway/bin/
 little-sun-gateway/models/*.gguf
 little-sun-gateway/models/*.bin
 !little-sun-gateway/models/.gitkeep
+little-sun-gateway/tmp/
 
 # IDE and OS
 .DS_Store

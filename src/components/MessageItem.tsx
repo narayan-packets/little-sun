@@ -12,19 +12,21 @@ import { ttsController, type TtsQueueSnapshot } from '../lib/tts';
 import { useAppState } from '../state/store';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { SunMark } from './SunMark';
-import { ImageCard } from './MediaViewer';
+import { ImageCard, AudioCard } from './MediaViewer';
 import { FileText } from 'lucide-react';
 
 interface ParsedUserContent {
   promptText: string;
   images: Array<{ alt: string; url: string }>;
   documents: Array<{ filename: string; text: string }>;
+  audios: Array<{ filename: string; url: string }>;
 }
 
 function parseUserMessage(content: string): ParsedUserContent {
   let remaining = content;
   const images: Array<{ alt: string; url: string }> = [];
   const documents: Array<{ filename: string; text: string }> = [];
+  const audios: Array<{ filename: string; url: string }> = [];
 
   // Extract attached document blocks (supporting both \n and \r\n)
   const docRegex = /\*\*Attached `([^`]+)`:\*\*\r?\n```[^\r\n]*\r?\n([\s\S]*?)```(?:\r?\n)*/g;
@@ -42,25 +44,52 @@ function parseUserMessage(content: string): ParsedUserContent {
   }
   remaining = remaining.replace(imgRegex, '').trim();
 
+  // Extract explicit audio tags e.g. [Audio: filename.mp3](url)
+  const audRegex = /\[Audio:\s*([^\]]+)\]\(([^)]+)\)/gi;
+  let audMatch: RegExpExecArray | null;
+  while ((audMatch = audRegex.exec(content)) !== null) {
+    audios.push({ filename: audMatch[1].trim(), url: audMatch[2].trim() });
+  }
+  remaining = remaining.replace(audRegex, '').trim();
+
+  // Extract direct audio links: [filename.mp3](https://.../filename.mp3?...)
+  const directAudioRegex = /\[([^\]]+)\]\(((?:https?:\/\/|data:audio\/)[^\s\)]+\.(?:mp3|wav|ogg|m4a|aac|flac|webm|opus)(?:\?[^\s\)]*)?)\)/gi;
+  let directAudMatch: RegExpExecArray | null;
+  while ((directAudMatch = directAudioRegex.exec(remaining)) !== null) {
+    if (!audios.some((a) => a.url === directAudMatch![2])) {
+      audios.push({ filename: directAudMatch[1].trim(), url: directAudMatch[2].trim() });
+    }
+  }
+  remaining = remaining.replace(directAudioRegex, '').trim();
+
   return {
     promptText: remaining,
     images,
     documents,
+    audios,
   };
 }
 
 const UserMessageContent: React.FC<{ content: string }> = ({ content }) => {
-  const { promptText, images, documents } = useMemo(() => parseUserMessage(content), [content]);
+  const { promptText, images, documents, audios } = useMemo(() => parseUserMessage(content), [content]);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
 
-  const displayPrompt = promptText || (images.length === 0 && documents.length === 0 ? content : '');
+  const displayPrompt =
+    promptText || (images.length === 0 && documents.length === 0 && audios.length === 0 ? content : '');
 
   return (
     <div className="flex flex-col items-end gap-2 max-w-[88%] sm:max-w-[78%]">
       {/* Attached Images */}
       {images.map((img: { alt: string; url: string }, i: number) => (
-        <div key={i} className="max-w-full">
+        <div key={`img-${i}`} className="max-w-full">
           <ImageCard src={img.url} alt={img.alt} />
+        </div>
+      ))}
+
+      {/* Attached Audios */}
+      {audios.map((aud: { filename: string; url: string }, i: number) => (
+        <div key={`aud-${i}`} className="w-full max-w-sm sm:max-w-md">
+          <AudioCard src={aud.url} title={aud.filename} />
         </div>
       ))}
 

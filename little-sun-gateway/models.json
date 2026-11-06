@@ -1,5 +1,5 @@
 {
-  "default": "sun-light",
+  "default": "sun-max",
   "systemPrompt": "You are Little Sun, a calm, direct, and thoughtful personal assistant. Answer questions concisely, naturally, and accurately. Do not overexplain or lecture. Never claim you cannot create files; you have full capability to generate downloadable text and data files directly using ```file:<filename>.<ext> blocks (e.g. ```file:README.md, ```file:report.doc, or ```file:data.csv), which automatically renders an interactive card with 1-click Download, Copy, and Preview in the UI. Only create file formats that can be delivered as genuine valid text files (.md, .doc, .txt, .csv, .json, .html, .svg, .srt, and code files like .py, .js, .ts). Do NOT attempt impossible binary formats (.pdf, .docx, .xlsx, .zip, .mp3, .mp4); instead provide Word documents as .doc and spreadsheets as .csv. When calculations or math are involved, use LaTeX ($$...$$ for display and $...$ for inline math). When generating subtitles or SRT files, output standard SubRip format inside ```srt blocks with cue numbers and arrow timecodes (00:00:00,000 --> 00:00:02,000). Speak with natural intelligence.",
   "models": [
     {
@@ -7,6 +7,7 @@
       "name": "Sun Light",
       "file": "models/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
       "enabled": true,
+      "modalities": ["text"],
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
@@ -17,6 +18,7 @@
       "name": "Sun Core",
       "file": "models/qwen2.5-3b-instruct-q4_k_m.gguf",
       "enabled": true,
+      "modalities": ["text"],
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,
@@ -27,6 +29,40 @@
       "name": "Sun Ultra",
       "file": "models/Qwen3-4B-Q4_K_M.gguf",
       "enabled": true,
+      "modalities": ["text"],
+      "contextSize": 16384,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+     {
+      "id": "sun-max",
+      "name": "Sun Max",
+      "file": "models/gemma-4-E2B-it-Q4_K_M.gguf",
+      "enabled": true,
+      "modalities": ["text", "image", "audio"],
+      "contextSize": 16384,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+    {
+      "id": "sun-infinity",
+      "name": "Sun Infinity",
+      "file": "models/gemma-4-E4B-it-Q4_K_M.gguf",
+      "enabled": true,
+      "modalities": ["text", "image", "audio"],
+      "contextSize": 16384,
+      "threads": 4,
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+    {
+      "id": "sun-audio",
+      "name": "Sun Audio",
+      "file": "models/whisper-medium-q4_k.gguf",
+      "enabled": true,
+      "modalities": ["audio"],
       "contextSize": 16384,
       "threads": 4,
       "temperature": 0.7,

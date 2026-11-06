@@ -295,6 +295,9 @@ export class LlamaManager {
     return validModels.map((m, idx) => {
       const available = this.isFileOnDisk(m.file);
       const id = m.id || `model-${idx + 1}`;
+      const modalities = Array.isArray(m.modalities) ? m.modalities : (m.modality ? [m.modality] : ['text']);
+      const supportsImages = modalities.includes('image') || modalities.includes('vision');
+      const supportsAudio = modalities.includes('audio');
       return {
         id,
         name: (typeof m.name === 'string' && m.name.trim()) || `Model ${idx + 1}`,
@@ -303,6 +306,9 @@ export class LlamaManager {
         isDefault: id === defaultId,
         contextSize: m.contextSize || 16384,
         maxTokens: m.maxTokens || 4096,
+        modalities,
+        supportsImages,
+        supportsAudio,
       };
     });
   }
@@ -466,6 +472,12 @@ export class LlamaManager {
       onColdStart();
     }
 
+    if (modelCfg.file && /whisper/i.test(modelCfg.file)) {
+      throw new Error(
+        `Whisper model "${modelCfg.name}" is an audio transcription model and cannot be hosted via llama-server. Please select a chat-compatible LLM.`
+      );
+    }
+
     const loadStart = Date.now();
     logger.log('LLM', `Cold-starting llama-server with model "${modelCfg.name}" (${modelCfg.file})...`);
 
@@ -484,6 +496,28 @@ export class LlamaManager {
       '-np',
       '1',
     ];
+
+    // Detect and attach multimodal vision projector (--mmproj) if available
+    let mmprojPath = null;
+    if (typeof modelCfg.mmproj === 'string' && modelCfg.mmproj.trim()) {
+      const resolved = this.resolveGatewayPath(modelCfg.mmproj);
+      if (fs.existsSync(resolved)) mmprojPath = resolved;
+    }
+    if (!mmprojPath) {
+      try {
+        const entries = fs.readdirSync(this.modelsDir);
+        const mmMatch = entries.find(
+          (e) => e.toLowerCase().includes('mmproj') && e.toLowerCase().endsWith('.gguf')
+        );
+        if (mmMatch) {
+          mmprojPath = path.join(this.modelsDir, mmMatch);
+        }
+      } catch {}
+    }
+    if (mmprojPath) {
+      args.push('--mmproj', mmprojPath);
+      logger.log('LLM', `Attached multimodal vision projector: ${path.basename(mmprojPath)}`);
+    }
 
     const child = spawn(binPath, args, {
       stdio: ['ignore', 'ignore', 'ignore'],
