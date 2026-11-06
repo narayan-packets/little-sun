@@ -15,13 +15,18 @@ import {
   startTtsSupervisor,
   stopTtsSupervisor,
 } from './tts-proxy.mjs';
+import { ModelRegistry } from './adapters/model-registry.mjs';
+import { MediaPreprocessor, TempTracker } from './adapters/media-preprocessor.mjs';
+import { BackendAdapterFactory, OLLAMA_MODEL_ALIASES } from './adapters/backend-adapters.mjs';
 
 const PORT = Number(process.env.PORT || 8790);
 const LLAMA_PORT = Number(process.env.LLAMA_PORT || 8089);
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const TTS_URL = process.env.TTS_URL || 'http://127.0.0.1:8000';
 const OWNER_EMAIL = (process.env.OWNER_EMAIL || '').toLowerCase().trim();
 const MAX_CHAT_CHARS = Number(process.env.MAX_CHAT_CHARS || 64000);
 const MAX_TTS_CHARS = Number(process.env.MAX_TTS_CHARS || 12000);
+const MAX_CHAT_PAYLOAD_BYTES = Number(process.env.MAX_CHAT_PAYLOAD_BYTES || 50 * 1024 * 1024); // 50MB body limit for multimodal Base64 payloads
 
 function resolveCustomFavicon() {
   const candidates = [];
@@ -72,6 +77,13 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*')
   .filter(Boolean);
 
 const llama = new LlamaManager({ llamaPort: LLAMA_PORT });
+const modelRegistry = new ModelRegistry({ ollamaUrl: OLLAMA_URL, gatewayDir: process.cwd() });
+const mediaPreprocessor = new MediaPreprocessor();
+const backendAdapterFactory = new BackendAdapterFactory({
+  ollamaUrl: OLLAMA_URL,
+  llamaManager: llama,
+  llamaPort: LLAMA_PORT,
+});
 
 let detectedFunnelUrl = (process.env.PUBLIC_FUNNEL_URL || '').trim().replace(/\/+$/, '');
 
@@ -247,7 +259,7 @@ function sendJson(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
-function readJsonBody(req, maxBytes = 65536) {
+function readJsonBody(req, maxBytes = MAX_CHAT_PAYLOAD_BYTES) {
   return new Promise((resolve, reject) => {
     let total = 0;
     const chunks = [];
@@ -453,7 +465,23 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/models') {
-    sendJson(res, 200, llama.getModelsList());
+    const list = llama.getModelsList();
+    try {
+      const isOllama = await backendAdapterFactory.ollamaAdapter.isAvailable();
+      if (isOllama) {
+        const ollamaModels = await backendAdapterFactory.ollamaAdapter.listModels();
+        const ollamaNames = new Set(ollamaModels.map((m) => m.name?.toLowerCase()));
+        for (const m of list) {
+          const resolved = backendAdapterFactory.ollamaAdapter.resolveOllamaModelName(m.id).toLowerCase();
+          if (ollamaNames.has(resolved) || ollamaNames.has(resolved.split(':')[0])) {
+            m.available = true;
+          }
+        }
+      }
+    } catch {
+      // ignore discovery error
+    }
+    sendJson(res, 200, list);
     return;
   }
 
@@ -515,14 +543,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (isChatBusy || llama.state === 'processing' || llama.state === 'loading') {
+    if (isChatBusy) {
       sendJson(res, 429, { error: 'busy' });
       return;
     }
 
     let body;
     try {
-      body = await readJsonBody(req, MAX_CHAT_CHARS * 2);
+      body = await readJsonBody(req, MAX_CHAT_PAYLOAD_BYTES);
     } catch (err) {
       sendJson(res, err.status || 400, { error: 'invalid_request' });
       return;
@@ -568,18 +596,8 @@ const server = http.createServer(async (req, res) => {
       `Chat stream started (model=${body.model || 'default'}, chat=${(chatId || 'new').slice(0, 8)}, context_msgs=${sanitizedMessages.length})`
     );
 
-    // Ephemeral file download pipeline: download uploaded files, feed to active LLM, and clean up
-    const downloadedFiles = [];
+    const tempTracker = new TempTracker();
     const supabaseFilesToDelete = [];
-    let attachedContext = '';
-    const localImageParts = [];
-
-    const TMP_DOWNLOADS_DIR = path.resolve(process.cwd(), 'tmp', 'downloads');
-    if (!fs.existsSync(TMP_DOWNLOADS_DIR)) {
-      try {
-        fs.mkdirSync(TMP_DOWNLOADS_DIR, { recursive: true });
-      } catch {}
-    }
 
     // Ephemeral attachments: ONLY download files attached to this specific request turn (never historic turns)
     const attachmentsList = [];
@@ -600,77 +618,42 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    if (attachmentsList.length > 0) {
-      for (const att of attachmentsList) {
-        if (!att.url || typeof att.url !== 'string') continue;
-        if (att.storagePath) {
-          supabaseFilesToDelete.push(att.storagePath);
-        } else {
-          try {
-            const parsedUrl = new URL(att.url);
-            const pathIdx = parsedUrl.pathname.indexOf('chat-uploads/');
-            if (pathIdx !== -1) {
-              supabaseFilesToDelete.push(decodeURIComponent(parsedUrl.pathname.slice(pathIdx + 13)));
-            }
-          } catch {}
-        }
-
-        try {
-          const cleanName = path.basename(att.name || 'file').replace(/[^a-zA-Z0-9.-]/g, '_');
-          const localTempPath = path.join(TMP_DOWNLOADS_DIR, `${Date.now()}_${cleanName}`);
-          logger.log('FILE', `Downloading ephemeral attachment to local machine: ${cleanName}`);
-          const fileRes = await fetch(att.url, { signal: AbortSignal.timeout(15000) });
-          if (fileRes.ok) {
-            const buf = Buffer.from(await fileRes.arrayBuffer());
-            fs.writeFileSync(localTempPath, buf);
-            downloadedFiles.push(localTempPath);
-            logger.log('FILE', `Downloaded to local disk: ${localTempPath} (${buf.length} bytes)`);
-
-            const ext = path.extname(cleanName).toLowerCase().replace('.', '');
-            const isText = ['txt', 'md', 'json', 'csv', 'py', 'js', 'ts', 'html', 'css', 'sql', 'sh', 'yaml', 'yml', 'xml', 'log', 'env', 'toml', 'tsv'].includes(ext);
-            if (isText) {
-              const fileText = buf.toString('utf8');
-              const truncatedText = fileText.length > 50000 ? fileText.slice(0, 50000) + '\n\n[File truncated to 50,000 characters]' : fileText;
-              attachedContext += `\n\n**Attached Document \`${cleanName}\`:**\n\`\`\`${ext}\n${truncatedText}\n\`\`\`\n`;
-            } else if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) {
-              const base64Img = buf.toString('base64');
-              const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
-              localImageParts.push({
-                type: 'image_url',
-                image_url: { url: `data:${mimeType};base64,${base64Img}` }
-              });
-              attachedContext += `\n\n[Local image verified on disk: \`${cleanName}\` (${buf.length} bytes)]`;
-            } else if (['mp3', 'wav', 'ogg', 'm4a', 'webm', 'flac', 'aac', 'opus'].includes(ext)) {
-              attachedContext += `\n\n[Local audio verified on disk: \`${cleanName}\` (${buf.length} bytes)]`;
-            }
-          }
-        } catch (downloadErr) {
-          logger.log('ERR', `Failed to download ephemeral attachment: ${downloadErr.message}`);
-        }
-      }
-    }
-
     try {
-      const modelCfg = await llama.ensureLoaded(
-        body.model,
-        () => {
-          if (!clientClosed) {
-            writeSse(res, { type: 'status', state: 'loading_model' });
-          }
-        },
-        chatId
-      );
+      // 1. Dynamic Model Capability Detection (Ollama /api/show & local registry)
+      const modelCaps = await modelRegistry.getModelCapabilities(body.model);
 
-      if (clientClosed) {
-        llama.finishProcessing();
-        isChatBusy = false;
-        res.end();
-        return;
+      // 2. Model-Agnostic Media Preprocessing (images normalized to Base64, audio resampled to 16kHz mono <=30s)
+      const processedMedia = [];
+      if (attachmentsList.length > 0) {
+        for (const att of attachmentsList) {
+          if (!att.url || typeof att.url !== 'string') continue;
+          if (att.storagePath) {
+            supabaseFilesToDelete.push(att.storagePath);
+          } else {
+            try {
+              const parsedUrl = new URL(att.url);
+              const pathIdx = parsedUrl.pathname.indexOf('chat-uploads/');
+              if (pathIdx !== -1) {
+                supabaseFilesToDelete.push(decodeURIComponent(parsedUrl.pathname.slice(pathIdx + 13)));
+              }
+            } catch {}
+          }
+
+          try {
+            const item = await mediaPreprocessor.processAttachment(att, modelCaps, tempTracker);
+            processedMedia.push(item);
+          } catch (procErr) {
+            logger.log('ERR', `Attachment processing error for ${att.name || 'file'}: ${procErr.message}`);
+            processedMedia.push({
+              type: 'unsupported',
+              filename: att.name || 'file',
+              reason: procErr.message,
+            });
+          }
+        }
       }
 
-      llama.beginProcessing();
-      writeSse(res, { type: 'status', state: 'generating' });
-
+      // 3. Dynamic system prompt (date/time context)
       const now = new Date();
       const dateStr = now.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -688,160 +671,60 @@ const server = http.createServer(async (req, res) => {
         .filter((m) => m.role === 'system')
         .map((m) => m.content)
         .join('\n\n');
-      const chatMessages = sanitizedMessages.filter((m) => m.role !== 'system');
-
-      // Inject downloaded file contents directly into the last user turn
-      if (attachedContext && chatMessages.length > 0) {
-        const lastIdx = chatMessages.length - 1;
-        if (chatMessages[lastIdx].role === 'user') {
-          chatMessages[lastIdx] = {
-            ...chatMessages[lastIdx],
-            content: `${chatMessages[lastIdx].content}${attachedContext}`,
-          };
-        }
-      }
 
       const dynamicSystemPrompt = [
-        modelCfg.systemPrompt,
         userProvidedSystem,
         `Today's date is ${dateStr}. Local time is ${timeStr}.`,
       ].filter(Boolean).join('\n\n');
 
-      const upstreamMessages = [
-        { role: 'system', content: dynamicSystemPrompt },
-        ...chatMessages.map((m, idx) => {
-          if (idx === chatMessages.length - 1 && m.role === 'user' && localImageParts.length > 0) {
-            return {
-              role: 'user',
-              content: [
-                { type: 'text', text: m.content },
-                ...localImageParts,
-              ],
-            };
-          }
-          return m;
-        }),
-      ];
-
-      let upstreamRes = await fetch(`http://127.0.0.1:${LLAMA_PORT}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: upstreamMessages,
-          stream: true,
-          temperature: modelCfg.temperature ?? 0.7,
-          max_tokens: modelCfg.maxTokens ?? 4096,
-          repeat_penalty: 1.18,
-          presence_penalty: 0.15,
-          frequency_penalty: 0.1,
-        }),
-        signal: upstreamAbort.signal,
+      // 4. Extensible Adapter Selection (Ollama or LlamaServer)
+      const adapter = await backendAdapterFactory.selectAdapter({
+        modelId: body.model,
+        preferredBackend: process.env.DEFAULT_BACKEND || 'auto',
       });
 
-      // If llama-server rejected due to image_url (e.g. no mmproj vision projector loaded), retry gracefully with text context
-      if (!upstreamRes.ok && localImageParts.length > 0) {
-        const rejectionText = await upstreamRes.text().catch(() => '');
-        logger.log(
-          'WARN',
-          `llama-server rejected image_url (HTTP ${upstreamRes.status}: ${rejectionText}). Retrying with descriptive text metadata...`
-        );
-
-        const fallbackMessages = chatMessages.map((m, idx) => {
-          if (idx === chatMessages.length - 1 && m.role === 'user') {
-            return {
-              role: 'user',
-              content: `${m.content}\n\n[Note: Image file was downloaded to host disk. Since active model lacks an mmproj projector file in models/, direct pixel analysis is unavailable.]`,
-            };
-          }
-          return m;
-        });
-
-        upstreamRes = await fetch(`http://127.0.0.1:${LLAMA_PORT}/v1/chat/completions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'system', content: dynamicSystemPrompt }, ...fallbackMessages],
-            stream: true,
-            temperature: modelCfg.temperature ?? 0.7,
-            max_tokens: modelCfg.maxTokens ?? 4096,
-            repeat_penalty: 1.18,
-            presence_penalty: 0.15,
-            frequency_penalty: 0.1,
-          }),
-          signal: upstreamAbort.signal,
-        });
-      }
-
-      if (!upstreamRes.ok || !upstreamRes.body) {
-        const errText = await upstreamRes.text().catch(() => '');
-        logger.log('ERR', `llama-server returned HTTP ${upstreamRes.status}: ${errText}`);
-        writeSse(res, {
-          type: 'error',
-          message: errText ? `Model generation error: ${errText.slice(0, 150)}` : 'Model generation failed.',
-        });
-        res.end();
-        return;
-      }
-
-      const reader = upstreamRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
       let tokenCount = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) continue;
-          const payloadStr = trimmed.slice(5).trim();
-          if (!payloadStr || payloadStr === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(payloadStr);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (typeof delta === 'string' && delta.length > 0) {
-              tokenCount += 1;
-              writeSse(res, { type: 'token', text: delta });
-            }
-          } catch {
-            // Ignore malformed SSE chunks
+      await adapter.streamChat({
+        modelId: body.model,
+        sanitizedMessages,
+        processedMedia,
+        dynamicSystemPrompt,
+        temperature: body.temperature ?? 0.7,
+        chatId,
+        signal: upstreamAbort.signal,
+        onStatus: (state) => {
+          if (!clientClosed) writeSse(res, { type: 'status', state });
+        },
+        onToken: (tok) => {
+          if (!clientClosed) {
+            tokenCount += 1;
+            writeSse(res, { type: 'token', text: tok });
           }
-        }
-      }
+        },
+        onError: (errMsg) => {
+          if (!clientClosed) writeSse(res, { type: 'error', message: errMsg });
+        },
+        onDone: (tokens) => {
+          const genElapsed = ((Date.now() - genStart) / 1000).toFixed(1);
+          logger.log(
+            'LLM',
+            `Chat stream completed via ${adapter.name} (model=${body.model || 'default'}, tokens=${tokens || tokenCount}, duration=${genElapsed}s)`
+          );
+          if (!clientClosed) writeSse(res, { type: 'done', tokens: tokens || tokenCount });
+        },
+      });
 
-      const genElapsed = ((Date.now() - genStart) / 1000).toFixed(1);
-      logger.log(
-        'LLM',
-        `Chat stream completed (model=${modelCfg.name}, tokens=${tokenCount}, duration=${genElapsed}s)`
-      );
-
-      if (!clientClosed) {
-        writeSse(res, { type: 'done', tokens: tokenCount });
-      }
       res.end();
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Generation interrupted or failed.';
-      logger.log('ERR', `Chat stream interrupted: ${errMsg}`);
+      logger.log('ERR', `Chat stream error: ${errMsg}`);
       if (!clientClosed) {
         writeSse(res, { type: 'error', message: errMsg });
         res.end();
       }
     } finally {
-      // Ephemeral cleanup: delete downloaded files from local machine
-      for (const tempPath of downloadedFiles) {
-        try {
-          if (fs.existsSync(tempPath)) {
-            fs.unlinkSync(tempPath);
-            logger.log('FILE', `Cleaned up local file: ${path.basename(tempPath)}`);
-          }
-        } catch (cleanupErr) {
-          logger.log('ERR', `Failed to delete local temp file: ${cleanupErr.message}`);
-        }
-      }
+      // Deterministic ephemeral cleanup: local disk temp files (tracked via TempTracker)
+      tempTracker.cleanup();
 
       // Ephemeral cleanup: delete uploaded files from Supabase Storage
       if (supabaseFilesToDelete.length > 0 && req.headers.authorization && process.env.SUPABASE_URL) {
@@ -855,15 +738,17 @@ const server = http.createServer(async (req, res) => {
               },
               body: JSON.stringify({ prefixes: [sPath] }),
             });
-            logger.log('FILE', `Cleaned up Supabase storage file: ${sPath}`);
+            logger.log('CLEANUP', `Cleaned up Supabase storage file: ${sPath}`);
           } catch (supaErr) {
-            logger.log('ERR', `Failed to delete Supabase ephemeral file: ${supaErr.message}`);
+            logger.log('WARN', `Failed to delete Supabase ephemeral file: ${supaErr.message}`);
           }
         }
       }
 
-      llama.finishProcessing();
       isChatBusy = false;
+      if (!res.writableEnded) {
+        res.end();
+      }
     }
     return;
   }
