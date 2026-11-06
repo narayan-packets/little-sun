@@ -13,14 +13,22 @@ function findGgufFiles(modelsDir) {
   try {
     const entries = fs.readdirSync(modelsDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isFile() && entry.name.toLowerCase().endsWith('.gguf')) {
+      const lower = entry.name.toLowerCase();
+      if (lower.includes('mmproj') || lower.includes('projector') || lower.includes('imatrix')) {
+        continue;
+      }
+      if (entry.isFile() && lower.endsWith('.gguf')) {
         results.push(`models/${entry.name}`);
       } else if (entry.isDirectory()) {
         const subDir = path.join(modelsDir, entry.name);
         try {
           const subFiles = fs.readdirSync(subDir, { withFileTypes: true });
           for (const sub of subFiles) {
-            if (sub.isFile() && sub.name.toLowerCase().endsWith('.gguf')) {
+            const subLower = sub.name.toLowerCase();
+            if (subLower.includes('mmproj') || subLower.includes('projector') || subLower.includes('imatrix')) {
+              continue;
+            }
+            if (sub.isFile() && subLower.endsWith('.gguf')) {
               results.push(`models/${entry.name}/${sub.name}`);
             }
           }
@@ -160,8 +168,10 @@ export class LlamaManager {
       const isTemplateMissing =
         (normFile === 'models/sun-core.gguf' || normFile === 'models/sun-light.gguf') &&
         !this.isFileOnDisk(rawFile);
+      const isProjectorOrImatrix =
+        normFile.includes('mmproj') || normFile.includes('projector') || normFile.includes('imatrix');
 
-      if (isTemplateMissing) {
+      if (isTemplateMissing || isProjectorOrImatrix) {
         needsWrite = true;
         continue;
       }
