@@ -240,7 +240,7 @@ interface AppStateContextValue {
   cloudStatus: 'ready' | 'generating' | 'error' | 'unconfigured';
   isAccessRestricted: boolean;
   isStreaming: boolean;
-  streamingStage: 'idle' | 'loading_model' | 'generating';
+  streamingStage: 'idle' | 'loading_model' | 'thinking' | 'generating';
   streamingContent: string;
   composerDraft: string;
   failedSend: FailedSendState | null;
@@ -458,7 +458,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [laptopStatus, setLaptopStatus] = useState<LaptopUiStatus>('sleeping');
   const [isAccessRestricted, setIsAccessRestricted] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingStage, setStreamingStage] = useState<'idle' | 'loading_model' | 'generating'>('idle');
+  const [streamingStage, setStreamingStage] = useState<'idle' | 'loading_model' | 'thinking' | 'generating'>('idle');
   const [streamingContent, setStreamingContent] = useState('');
 
   const cloudStatus = useMemo<'ready' | 'generating' | 'error' | 'unconfigured'>(() => {
@@ -1458,7 +1458,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       abortControllerRef.current = controller;
       isStreamingRef.current = true;
       setIsStreaming(true);
-      setStreamingStage('generating');
+      const activeModelObj = allModels.find((m) => m.id === modelId);
+      const isModelThinkingCapable = Boolean(activeModelObj?.supportsThinking ?? activeModelObj?.thinking);
+      setStreamingStage(mode === 'local' && isThinkingActive && isModelThinkingCapable ? 'thinking' : 'generating');
       setStreamingContent('');
       setStreamingThinking('');
 
@@ -1556,11 +1558,15 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   setStreamingStage('loading_model');
                   setLaptopStatus('waking');
                 } else if (evt.state === 'generating') {
-                  setStreamingStage('generating');
+                  if (rawThinkingAccumulated.length > 0) {
+                    setStreamingStage('thinking');
+                  } else {
+                    setStreamingStage('generating');
+                  }
                   setLaptopStatus('ready');
                 }
               } else if (evt.type === 'thinking') {
-                setStreamingStage('generating');
+                setStreamingStage('thinking');
                 setLaptopStatus('ready');
                 rawThinkingAccumulated += evt.text;
                 setStreamingThinking(rawThinkingAccumulated);

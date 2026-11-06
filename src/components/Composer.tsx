@@ -856,7 +856,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
             {/* Active Web Search Badge centered right after 3-dot menu */}
             {mode === 'local' && isWebSearchActive && (
               <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
                 style={{
                   backgroundColor: 'var(--surface-2)',
                   borderColor: 'var(--border)',
@@ -891,7 +891,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
             {/* Active Thinking Badge centered right after 3-dot menu / search badge */}
             {mode === 'local' && supportsThinking && isThinkingActive && (
               <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
                 style={{
                   backgroundColor: 'var(--surface-2)',
                   borderColor: 'var(--border)',
@@ -931,7 +931,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
                         ? 'How can I help you today?'
                         : 'Reply to Little Sun…'
               }
-              className="composer-textarea flex-1 max-h-[180px] min-h-[38px] py-1.5 px-2 bg-transparent border-0 resize-none disabled:cursor-not-allowed outline-none text-[15px] sm:text-base leading-normal"
+              className="composer-textarea flex-1 min-w-[80px] max-h-[180px] min-h-[38px] py-1.5 px-2 bg-transparent border-0 resize-none disabled:cursor-not-allowed outline-none text-[15px] sm:text-base leading-normal"
               style={{
                 color: 'var(--text)',
               }}

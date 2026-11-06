@@ -191,11 +191,24 @@ function isStandaloneMathLine(line: string): boolean {
   const t = line.trim();
   if (!t || t.length < 2) return false;
 
-  // Ignore markdown headings, blockquotes, list markers, code keywords, links
+  // Ignore markdown headings, blockquotes, list markers, code keywords, links, and lines that already contain inline math or code
   if (/^(?:#{1,6}\s|>|[-*+]\s|\d+\.\s|const\s|let\s|var\s|function\s|return\s|import\s|export\s|\/\/|\/\*)/.test(t)) {
     return false;
   }
-  if (t.includes(';') || t.includes('http:') || t.includes('https:') || t.startsWith('`')) {
+  if (t.includes(';') || t.includes('http:') || t.includes('https:') || t.includes('`') || t.includes('math-inline:')) {
+    return false;
+  }
+
+  // Reject sentences that contain common conversational / explanatory English prose words
+  if (/\b(?:the|is|are|was|were|of|to|and|in|for|we|can|find|calculate|use|let|step|determine|solve|formula|equation|discriminant|root|roots|value|values|symbol|process|explanation|goal|now|then|first|second|two|both|positive|negative|standard|form)\b/i.test(t)) {
+    return false;
+  }
+
+  // Reject lines containing more than 2 regular English words
+  const words = (t.match(/\b[a-zA-Z]{3,}\b/g) || []).filter(
+    (w) => !/^(?:sin|cos|tan|cot|sec|csc|log|ln|lim|det|dim|ker|max|min|sup|inf|arg|deg|gcd|mod|exp)$/i.test(w)
+  );
+  if (words.length > 2) {
     return false;
   }
 
@@ -248,6 +261,9 @@ function preprocessMathMarkdown(raw: string): string {
   if (!raw) return raw;
 
   let text = raw;
+
+  // Convert HTML underline and ins tags into markdown underline anchors
+  text = text.replace(/<(?:u|ins)>([\s\S]*?)<\/(?:u|ins)>/gi, (_, inner) => `[${inner}](#underline)`);
 
   // 1. Convert LaTeX display environments into fenced math blocks
   text = text.replace(
@@ -1213,6 +1229,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
         },
         a({ href, children }) {
           if (!href) return <a>{children}</a>;
+          if (href === '#underline') {
+            return <span className="underline underline-offset-2 font-medium">{children}</span>;
+          }
           const isVid = /\.(mp4|webm|mov)(\?.*)?$/i.test(href);
           const isImg = /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(href);
           const isDoc = /\.(docx?|pdf|csv|xlsx?|txt|rtf|srt|vtt|zip)(\?.*)?$/i.test(href);

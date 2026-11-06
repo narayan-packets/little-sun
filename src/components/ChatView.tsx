@@ -413,7 +413,11 @@ export const ChatView: React.FC = () => {
                             <>
                               <SunMark size={16} state="waking" animated />
                               <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                                {streamingStage === 'loading_model' ? 'Waking model…' : 'Thinking…'}
+                                {streamingStage === 'loading_model'
+                                  ? 'Waking model…'
+                                  : streamingStage === 'thinking'
+                                    ? 'Thinking…'
+                                    : 'Generating…'}
                               </span>
                             </>
                           )}
