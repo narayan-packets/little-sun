@@ -277,26 +277,27 @@ function preprocessMathMarkdown(raw: string): string {
   });
 
   // 3. Convert $$ ... $$ display math into fenced math blocks
-  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => {
-    return `\n\n\`\`\`math\n${inner.trim()}\n\`\`\`\n\n`;
-  });
-
-  // 4. Convert \( ... \) inline math into `math-inline:...`
-  text = text.replace(/\\\(([^\n]+?)\\\)/g, (_, inner) => {
-    return `\`math-inline:${inner.trim()}\``;
-  });
-
-  // 5. Convert $ ... $ inline math (avoiding currency like $10 or $50)
-  text = text.replace(
-    /(?<![\\$\d])\$(?!\s)((?:\\.|[^$\n])+?)(?<!\s)\$(?!\d)/g,
-    (match, inner) => {
-      const trimmed = inner.trim();
-      if (/^\d+(?:[.,]\d+)?\s/.test(trimmed)) return match;
-      return `\`math-inline:${trimmed}\``;
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (match, inner) => {
+    const trimmed = inner.trim();
+    // If the block contains plain English words with NO math symbols or equations, unwrap as plain text
+    const hasMath = /[\\=^_{}±×÷+\-*/]/.test(trimmed) || /\b[a-zA-Z]\s*=\s*/.test(trimmed) || /\d/.test(trimmed);
+    if (!hasMath) {
+      return `\n\n${trimmed}\n\n`;
     }
-  );
 
-  // 6. Split by all fenced code blocks (both existing ones and the newly converted math blocks)
+    // If it starts with conversational English preamble followed by colon or newline, separate it
+    const preambleMatch = trimmed.match(/^([A-Z][a-zA-Z\s,'’]+?[:\n]+)\s*([\s\S]+)$/);
+    if (preambleMatch && preambleMatch[2].length > 0) {
+      const preamble = preambleMatch[1].trim();
+      const actualMath = preambleMatch[2].trim();
+      return `\n\n${preamble}\n\n\`\`\`math\n${actualMath}\n\`\`\`\n\n`;
+    }
+
+    return `\n\n\`\`\`math\n${trimmed}\n\`\`\`\n\n`;
+  });
+
+  // 4. Split by all fenced code blocks (both existing ones and the newly converted math blocks)
+  // This ensures inline math replacements NEVER match or corrupt the content inside code or math blocks!
   const parts = text.split(/(```[\s\S]*?```)/g);
 
   return parts
@@ -304,10 +305,29 @@ function preprocessMathMarkdown(raw: string): string {
       // Odd indices are fenced code blocks — leave completely untouched!
       if (index % 2 === 1) return segment;
 
-      const lines = segment.split('\n');
+      let seg = segment;
+
+      // Convert \( ... \) inline math into `math-inline:...`
+      seg = seg.replace(/\\\(([^\n]+?)\\\)/g, (_, inner) => {
+        return `\`math-inline:${inner.trim()}\``;
+      });
+
+      // Convert $ ... $ inline math (avoiding currency like $10 or $50)
+      seg = seg.replace(
+        /(?<![\\$\d])\$(?!\s)((?:\\.|[^$\n])+?)(?<!\s)\$(?!\d)/g,
+        (match, inner) => {
+          const trimmed = inner.trim();
+          if (/^\d+(?:[.,]\d+)?\s/.test(trimmed)) return match;
+          return `\`math-inline:${trimmed}\``;
+        }
+      );
+
+      const lines = seg.split('\n');
       const processedLines = lines.map((line) => {
         const trimmed = line.trim();
         if (!trimmed) return line;
+
+        if (line.includes('`math-inline:')) return line;
 
         if (isStandaloneMathLine(trimmed)) {
           return `\n\`\`\`math\n${trimmed}\n\`\`\`\n`;

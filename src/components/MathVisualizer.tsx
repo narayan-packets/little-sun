@@ -1036,7 +1036,7 @@ export const MathVisualCard: React.FC<MathVisualCardProps> = ({ code, isStreamin
       </div>
 
       {/* Main Typeset Math Stage */}
-      <div className="p-4 sm:p-5 overflow-x-auto">
+      <div className="p-3 sm:p-5 overflow-x-auto max-w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div
           className="ls-katex-display text-center py-1"
           dangerouslySetInnerHTML={{ __html: html }}

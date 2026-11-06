@@ -361,3 +361,31 @@ body {
   }
 }
 
+/* Responsive KaTeX & Math rendering for desktop & mobile */
+.ls-katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0.5em 0 !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.katex {
+  font-size: 1.05em;
+  text-rendering: auto;
+}
+
+@media (max-width: 640px) {
+  .katex {
+    font-size: 0.95em;
+  }
+}
+
