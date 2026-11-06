@@ -13,6 +13,8 @@ export interface GatewayModel {
   supportsAudio?: boolean;
   supportsThinking?: boolean;
   thinking?: boolean;
+  supportsTools?: boolean;
+  tools?: boolean;
 }
 
 const LEGACY_MODEL_OVERRIDES_KEY = 'littlesun_model_overrides_v1';
@@ -40,6 +42,8 @@ export function sanitizeBackendModels(models: GatewayModel[]): GatewayModel[] {
       supportsAudio: typeof m.supportsAudio === 'boolean' ? m.supportsAudio : undefined,
       supportsThinking: Boolean(m.supportsThinking ?? m.thinking ?? false),
       thinking: Boolean(m.supportsThinking ?? m.thinking ?? false),
+      supportsTools: Boolean(m.supportsTools ?? m.tools ?? false),
+      tools: Boolean(m.supportsTools ?? m.tools ?? false),
     }));
 }
 
@@ -416,10 +420,11 @@ export async function streamGatewayChat(params: {
   messages: ChatMessagePayload[];
   attachments?: Array<{ id: string; name: string; type: string; url: string; storagePath?: string }>;
   thinking?: boolean;
+  webSearch?: boolean;
   signal: AbortSignal;
   onEvent: (event: ChatStreamEvent) => void;
 }): Promise<void> {
-  const { accessToken, chatId, model, messages, attachments, thinking, signal, onEvent } = params;
+  const { accessToken, chatId, model, messages, attachments, thinking, webSearch, signal, onEvent } = params;
   const gatewayUrl = getGatewayUrl();
 
   const res = await fetch(`${gatewayUrl}/chat`, {
@@ -428,7 +433,7 @@ export async function streamGatewayChat(params: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ chatId, model, messages, attachments, thinking }),
+    body: JSON.stringify({ chatId, model, messages, attachments, thinking, webSearch }),
     signal,
   });
 

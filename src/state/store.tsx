@@ -1395,10 +1395,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         memoryContext += `\n\n(Memory Event: The user just instructed you to forget: "${activeForgetMemory}". Confirm concisely that you have forgotten it.)`;
       }
 
-      // Perform free live web search if enabled (works in both Local and Cloud modes)
+      // Perform live web search for cloud mode if enabled (local mode handles intelligent dual search at gateway)
       let liveWebContext = '';
       let searchSources: Array<{ title: string; url: string }> = [];
-      if (isWebSearchActive) {
+      if (isWebSearchActive && mode === 'cloud') {
         const lastUser = [...cleanedHistory].reverse().find((m) => m.role === 'user');
         if (lastUser?.content && shouldPerformWebSearch(lastUser.content)) {
           try {
@@ -1551,6 +1551,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               storagePath: a.storagePath,
             })),
             thinking: isThinkingActive,
+            webSearch: isWebSearchActive,
             signal: controller.signal,
             onEvent: (evt) => {
               if (evt.type === 'status') {

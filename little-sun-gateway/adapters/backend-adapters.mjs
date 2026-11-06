@@ -15,6 +15,117 @@ export const OLLAMA_MODEL_ALIASES = {
 };
 
 /**
+ * Native tool definition for Ollama function calling.
+ */
+export const SEARCH_WEB_TOOL = {
+  type: 'function',
+  function: {
+    name: 'search_web',
+    description: 'Search the live web for recent news, real-time facts, current weather, scores, or events.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query keywords to find relevant information on the web',
+        },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+/**
+ * Determines whether a message warrants live web search.
+ * Filters out greetings, farewells, acknowledgments, math, and code generation.
+ */
+export function shouldPerformWebSearch(text) {
+  if (!text || typeof text !== 'string') return false;
+  const clean = text.trim();
+  if (clean.length < 2) return false;
+  const lower = clean.toLowerCase();
+
+  // Farewells, acknowledgments, greetings
+  if (/^(?:bye|goodbye|cya|see you|good night|gn|catch you later|take care)[\s!.]*$/i.test(lower)) return false;
+  if (/^(?:hi|hello|hey|yo|howdy|sup|greetings|good\s+(?:morning|afternoon|evening|day))[\s!.,?]*$/i.test(lower)) return false;
+  if (/^(?:ok|okay|k|cool|nice|great|awesome|understood|got it|thanks|thank you|thx|cheers|sure|yes|no|yep|nope)[\s!.]*$/i.test(lower)) return false;
+  if (/^(?:who are you|what are you|what is your name|how are you|how are you doing|how's it going|what can you do)[\s!.,?]*$/i.test(lower)) return false;
+
+  // Code / syntax requests (local model handles)
+  if (/^(?:write|create|implement|give me|generate|code|show me)\s+(?:a\s+)?(?:python|javascript|typescript|c\+\+|rust|java|html|css|sql|function|script|code|component|regex|class|algorithm)/i.test(lower)) {
+    return false;
+  }
+
+  // Math expressions
+  if (/^[0-9+\-*/^().\s=%]+$/.test(clean) || /^(?:calculate|compute|solve|what is)\s+[0-9+\-*/^().\s]+$/i.test(lower)) {
+    return false;
+  }
+
+  // Explicit search triggers
+  if (/\b(?:search|search for|google|browse|lookup|look up|check online|find out|source)\b/i.test(lower)) {
+    return true;
+  }
+
+  // Real-time factual inquiry keywords
+  if (/\b(?:weather|forecast|temperature|rain|snow|humidity|climate|stock|price|crypto|bitcoin|btc|eth|market|score|match|game|news|latest|recent|current|today|tomorrow|yesterday|election|release date|version|specs|who won|who is)\b/i.test(lower)) {
+    return true;
+  }
+
+  // Questions seeking factual information with question mark
+  if (/^(?:what|when|where|who|why|how much|how many|is it|did|does|can you find)\b/i.test(lower) && clean.includes('?')) {
+    return true;
+  }
+
+  const words = clean.split(/\s+/).length;
+  if (words <= 4) return false;
+
+  return true;
+}
+
+/**
+ * Strips conversational fluff, preambles, and postambles to produce crisp search keywords.
+ */
+export function formulateCleanSearchKeywords(text) {
+  if (!text || typeof text !== 'string') return '';
+  let q = text
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[.*?\]\(.*?\)/g, '')
+    .split('\n')[0]
+    .trim();
+
+  // Strip conversational preambles
+  const preambles = [
+    /^(?:can you|could you|please|kindly)\s+(?:tell me|find|search|lookup|look up|check|browse)\s+(?:about|for|if)?/i,
+    /^(?:tell me|search for|search|lookup|look up|browse for|check out|find out|find)\s+(?:about|for|if)?/i,
+    /^(?:i want to know|i would like to know|i need to know|do you know|can you find)\s+(?:if|about|what|when|where|who)?/i,
+    /^(?:what is|what are|what was|what were|who is|who was|who are|where is|when is|how is)\s+/i,
+    /^(?:what's|who's|where's|when's|how's)\s+/i,
+    /^(?:hello|hi|hey|good\s+(?:morning|afternoon|evening)|umm+|uh+)\s*[,.!?:]*\s*/i,
+  ];
+
+  let prev = '';
+  while (prev !== q) {
+    prev = q;
+    for (const p of preambles) {
+      q = q.replace(p, '').trim();
+    }
+  }
+
+  // Strip trailing formatting directives
+  const postambles = [
+    /\s+(?:in a table|as a table|in table format|in bullet points|step by step|in detail|briefly|in 2 sentences|in one sentence|please|thanks|thank you)\s*$/i,
+    /\s+(?:answer in short|give me a summary|give me a list|summarize this)\s*$/i,
+  ];
+  for (const p of postambles) {
+    q = q.replace(p, '').trim();
+  }
+
+  q = q.replace(/[?!:;"]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return q.slice(0, 100);
+}
+
+/**
  * Base Backend Adapter interface.
  */
 export class BaseBackendAdapter {
@@ -30,6 +141,7 @@ export class BaseBackendAdapter {
 /**
  * Ollama Backend Adapter: formats multimodal requests (images array, audio chunks, text)
  * and streams tokens via NDJSON from Ollama's /api/chat.
+ * Supports both Native Tool Calling (search_web) and Fallback Search Injection.
  */
 export class OllamaBackendAdapter extends BaseBackendAdapter {
   constructor({ ollamaUrl = OLLAMA_DEFAULT_URL } = {}) {
@@ -79,6 +191,9 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
     temperature = 0.7,
     signal,
     thinking = true,
+    webSearch = false,
+    supportsTools = false,
+    searchFn = null,
     onToken,
     onThinking,
     onStatus,
@@ -151,6 +266,43 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
 
     ollamaMessages.push(finalUserMessage);
 
+    // 3. Web Search Strategy Determination
+    const useTools = Boolean(webSearch && supportsTools && typeof searchFn === 'function');
+    const useFallbackSearch = Boolean(webSearch && !useTools && typeof searchFn === 'function');
+    const distinctRetrievedSources = [];
+
+    // Fallback Path: For models where supportsTools === false (e.g. Sun Light / Llama 3.2 1B)
+    if (useFallbackSearch && shouldPerformWebSearch(userText)) {
+      const searchKeywords = formulateCleanSearchKeywords(userText);
+      if (searchKeywords && searchKeywords.length >= 2) {
+        try {
+          logger.log('NET', `Fallback search for model "${targetModel}": "${searchKeywords}"`);
+          const searchResults = await searchFn(searchKeywords, 6);
+          if (Array.isArray(searchResults) && searchResults.length > 0) {
+            const seen = new Set();
+            for (const r of searchResults) {
+              if (r.url && !seen.has(r.url)) {
+                seen.add(r.url);
+                distinctRetrievedSources.push({ title: r.title || r.url, url: r.url });
+              }
+            }
+            const injectedBlock = `\n\n[Live Web Search Results for "${searchKeywords}"]:\n` +
+              searchResults.map((r, i) => `${i + 1}. Title: ${r.title}\nSnippet: ${r.snippet}\nURL: ${r.url}`).join('\n\n') +
+              `\n\nAnswer the user factually based on these real-time web search results.`;
+
+            const sysMsg = ollamaMessages.find((m) => m.role === 'system');
+            if (sysMsg) {
+              sysMsg.content += injectedBlock;
+            } else {
+              ollamaMessages.unshift({ role: 'system', content: injectedBlock.trim() });
+            }
+          }
+        } catch (searchErr) {
+          logger.log('WARN', `Fallback search error: ${searchErr.message}`);
+        }
+      }
+    }
+
     const payload = {
       model: targetModel,
       messages: ollamaMessages,
@@ -160,9 +312,13 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
       },
     };
 
+    if (useTools) {
+      payload.tools = [SEARCH_WEB_TOOL];
+    }
+
     logger.log(
       'OLLAMA',
-      `Forwarding to Ollama /api/chat (model=${targetModel}, messages=${ollamaMessages.length}, images=${imagesArray.length})`
+      `Forwarding to Ollama /api/chat (model=${targetModel}, messages=${ollamaMessages.length}, images=${imagesArray.length}, tools=${useTools})`
     );
 
     let res;
@@ -202,11 +358,13 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
       return;
     }
 
-    // 3. Read streaming NDJSON response from Ollama
+    // 4. Read streaming NDJSON response from Ollama
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     let tokenCount = 0;
+    let streamedTokens = '';
+    const accumulatedToolCalls = [];
 
     try {
       while (true) {
@@ -225,6 +383,12 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
               if (typeof onError === 'function') onError(chunk.error);
               return;
             }
+
+            // Collect native tool calls if emitted
+            if (chunk.message?.tool_calls && Array.isArray(chunk.message.tool_calls)) {
+              accumulatedToolCalls.push(...chunk.message.tool_calls);
+            }
+
             // Stream reasoning trace when model supports thinking and thinking is enabled
             const thinkingChunk = chunk.message?.thinking;
             if (typeof thinkingChunk === 'string' && thinkingChunk.length > 0) {
@@ -236,17 +400,116 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
             const token = chunk.message?.content;
             if (typeof token === 'string' && token.length > 0) {
               tokenCount += 1;
+              streamedTokens += token;
               if (typeof onToken === 'function') onToken(token);
-            }
-            if (chunk.done) {
-              const evalTokens = chunk.eval_count || tokenCount;
-              if (typeof onDone === 'function') onDone(evalTokens);
-              return;
             }
           } catch {
             // ignore malformed NDJSON line
           }
         }
+      }
+
+      // 5. If Native Tool Call was triggered, execute tool and initiate follow-up pass
+      if (accumulatedToolCalls.length > 0 && typeof searchFn === 'function') {
+        for (const call of accumulatedToolCalls) {
+          if (call.function?.name === 'search_web') {
+            let callQuery = '';
+            try {
+              const args = typeof call.function.arguments === 'string'
+                ? JSON.parse(call.function.arguments)
+                : call.function.arguments;
+              callQuery = args?.query || '';
+            } catch {
+              callQuery = String(call.function.arguments || '');
+            }
+
+            if (callQuery) {
+              logger.log('TOOL', `Executing native tool search_web: "${callQuery}"`);
+              let searchResults = [];
+              try {
+                searchResults = await searchFn(callQuery, 6);
+                logger.log('TOOL', `search_web returned ${searchResults.length} result(s) for "${callQuery}"`);
+                const seen = new Set();
+                for (const r of searchResults) {
+                  if (r.url && !seen.has(r.url)) {
+                    seen.add(r.url);
+                    distinctRetrievedSources.push({ title: r.title || r.url, url: r.url });
+                  }
+                }
+              } catch (toolErr) {
+                logger.log('WARN', `Tool search_web failed: ${toolErr.message}`);
+              }
+
+              ollamaMessages.push({
+                role: 'assistant',
+                content: '',
+                tool_calls: accumulatedToolCalls,
+              });
+
+              ollamaMessages.push({
+                role: 'tool',
+                content: JSON.stringify({ results: searchResults }),
+              });
+            }
+          }
+        }
+
+        // Stream follow-up pass with tool output
+        const followUpPayload = {
+          model: targetModel,
+          messages: ollamaMessages,
+          stream: true,
+          options: {
+            temperature: Number(temperature) || 0.7,
+          },
+        };
+
+        const res2 = await fetch(`${this.ollamaUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(followUpPayload),
+          signal,
+        });
+
+        if (res2.ok && res2.body) {
+          const reader2 = res2.body.getReader();
+          let buffer2 = '';
+          while (true) {
+            const { done, value } = await reader2.read();
+            if (done) break;
+            buffer2 += decoder.decode(value, { stream: true });
+            const lines2 = buffer2.split('\n');
+            buffer2 = lines2.pop() || '';
+
+            for (const line of lines2) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              try {
+                const chunk2 = JSON.parse(trimmed);
+                if (chunk2.message?.thinking) {
+                  if (thinking !== false && typeof onThinking === 'function') {
+                    onThinking(chunk2.message.thinking);
+                  }
+                }
+                const tok2 = chunk2.message?.content;
+                if (typeof tok2 === 'string' && tok2.length > 0) {
+                  tokenCount += 1;
+                  streamedTokens += tok2;
+                  if (typeof onToken === 'function') onToken(tok2);
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
+      }
+
+      // 6. Append Sources block if search was conducted and sources were found
+      if (distinctRetrievedSources.length > 0 && !streamedTokens.includes('### Sources')) {
+        const sourcesBlock = `\n\n### Sources\n${distinctRetrievedSources.map((s) => `- [${s.title}](${s.url})`).join('\n')}`;
+        streamedTokens += sourcesBlock;
+        if (typeof onToken === 'function') onToken(sourcesBlock);
       }
 
       if (typeof onDone === 'function') {
@@ -278,6 +541,9 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
     temperature = 0.7,
     chatId = null,
     signal,
+    webSearch = false,
+    supportsTools = false,
+    searchFn = null,
     onToken,
     onStatus,
     onError,
@@ -322,6 +588,34 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
           ...chatMessages[lastIdx],
           content: `${chatMessages[lastIdx].content}${attachedTextContext}`,
         };
+      }
+    }
+
+    // Web search injection for LlamaServer if enabled
+    const distinctRetrievedSources = [];
+    const lastUserMsg = chatMessages[chatMessages.length - 1];
+    if (webSearch && typeof searchFn === 'function' && lastUserMsg && shouldPerformWebSearch(lastUserMsg.content)) {
+      const searchKeywords = formulateCleanSearchKeywords(lastUserMsg.content);
+      if (searchKeywords && searchKeywords.length >= 2) {
+        try {
+          logger.log('NET', `LlamaServer web search: "${searchKeywords}"`);
+          const searchResults = await searchFn(searchKeywords, 6);
+          if (Array.isArray(searchResults) && searchResults.length > 0) {
+            const seen = new Set();
+            for (const r of searchResults) {
+              if (r.url && !seen.has(r.url)) {
+                seen.add(r.url);
+                distinctRetrievedSources.push({ title: r.title || r.url, url: r.url });
+              }
+            }
+            const injectedBlock = `\n\n[Live Web Search Results for "${searchKeywords}"]:\n` +
+              searchResults.map((r, i) => `${i + 1}. Title: ${r.title}\nSnippet: ${r.snippet}\nURL: ${r.url}`).join('\n\n') +
+              `\n\nAnswer the user factually based on these real-time web search results.`;
+            dynamicSystemPrompt = (dynamicSystemPrompt || modelCfg.systemPrompt || '') + injectedBlock;
+          }
+        } catch (searchErr) {
+          logger.log('WARN', `LlamaServer search error: ${searchErr.message}`);
+        }
       }
     }
 
@@ -398,6 +692,7 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
     const decoder = new TextDecoder();
     let buffer = '';
     let tokenCount = 0;
+    let streamedTokens = '';
 
     try {
       while (true) {
@@ -417,12 +712,18 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
             const delta = parsed.choices?.[0]?.delta?.content;
             if (typeof delta === 'string' && delta.length > 0) {
               tokenCount += 1;
+              streamedTokens += delta;
               if (typeof onToken === 'function') onToken(delta);
             }
           } catch {
             // ignore malformed chunk
           }
         }
+      }
+
+      if (distinctRetrievedSources.length > 0 && !streamedTokens.includes('### Sources')) {
+        const sourcesBlock = `\n\n### Sources\n${distinctRetrievedSources.map((s) => `- [${s.title}](${s.url})`).join('\n')}`;
+        if (typeof onToken === 'function') onToken(sourcesBlock);
       }
 
       this.llama.finishProcessing();

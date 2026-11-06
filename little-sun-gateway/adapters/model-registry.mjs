@@ -64,6 +64,8 @@ export class ModelRegistry {
       supportsVision: false,
       supportsAudio: false,
       supportsText: true,
+      supportsThinking: false,
+      supportsTools: false,
       maxImageDimension: 1536,
       audioEnvelope: {
         maxDurationSec: 30,
@@ -89,6 +91,8 @@ export class ModelRegistry {
           caps.supportsVision = modalities.includes('image') || modalities.includes('vision');
           caps.supportsAudio = modalities.includes('audio');
           caps.supportsText = modalities.includes('text') || modalities.length === 0;
+          caps.supportsThinking = Boolean(targetModel.supportsThinking ?? targetModel.thinking ?? false);
+          caps.supportsTools = Boolean(targetModel.supportsTools ?? targetModel.tools ?? false);
           caps.source = 'models.json';
         }
       }

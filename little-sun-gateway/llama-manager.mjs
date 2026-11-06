@@ -345,6 +345,7 @@ export class LlamaManager {
       const supportsImages = modalities.includes('image') || modalities.includes('vision');
       const supportsAudio = modalities.includes('audio');
       const supportsThinking = Boolean(m.supportsThinking ?? m.thinking ?? false);
+      const supportsTools = Boolean(m.supportsTools ?? m.tools ?? false);
       return {
         id,
         name: (typeof m.name === 'string' && m.name.trim()) || `Model ${idx + 1}`,
@@ -358,6 +359,8 @@ export class LlamaManager {
         supportsAudio,
         supportsThinking,
         thinking: supportsThinking,
+        supportsTools,
+        tools: supportsTools,
         hasProjector: hasMmproj,
       };
     });
@@ -547,20 +550,31 @@ export class LlamaManager {
       '1',
     ];
 
-    // Detect and attach multimodal vision projector (--mmproj) if available
+    // Detect and attach multimodal vision projector (--mmproj) if explicitly configured or matches architecture
     let mmprojPath = null;
     if (typeof modelCfg.mmproj === 'string' && modelCfg.mmproj.trim()) {
       const resolved = this.resolveGatewayPath(modelCfg.mmproj);
       if (fs.existsSync(resolved)) mmprojPath = resolved;
     }
-    if (!mmprojPath) {
+    if (!mmprojPath && modelCfg.file) {
       try {
-        const entries = fs.readdirSync(this.modelsDir);
-        const mmMatch = entries.find(
-          (e) => e.toLowerCase().includes('mmproj') && e.toLowerCase().endsWith('.gguf')
-        );
-        if (mmMatch) {
-          mmprojPath = path.join(this.modelsDir, mmMatch);
+        const baseFileName = path.basename(modelCfg.file, path.extname(modelCfg.file)).toLowerCase();
+        const isVisionCapable = baseFileName.includes('gemma-4') || baseFileName.includes('gemma4') ||
+                                baseFileName.includes('llava') || baseFileName.includes('qwen2-vl');
+        if (isVisionCapable) {
+          const entries = fs.readdirSync(this.modelsDir);
+          const mmMatch = entries.find((e) => {
+            const eLower = e.toLowerCase();
+            if (!eLower.includes('mmproj') || !eLower.endsWith('.gguf')) return false;
+            if (baseFileName.includes('e4b') && eLower.includes('e4b')) return true;
+            if (baseFileName.includes('e2b') && eLower.includes('e2b')) return true;
+            if (baseFileName.includes('qwen') && eLower.includes('qwen')) return true;
+            if (baseFileName.includes('llava') && eLower.includes('llava')) return true;
+            return false;
+          });
+          if (mmMatch) {
+            mmprojPath = path.join(this.modelsDir, mmMatch);
+          }
         }
       } catch {}
     }

@@ -685,6 +685,10 @@ const server = http.createServer(async (req, res) => {
 
       let tokenCount = 0;
       const thinkingEnabled = body.thinking !== undefined ? Boolean(body.thinking) : true;
+      const webSearchEnabled = Boolean(body.webSearch);
+      const modelCfg = llama.getModelConfig(body.model);
+      const supportsTools = Boolean(modelCfg?.supportsTools ?? modelCfg?.tools ?? false);
+
       await adapter.streamChat({
         modelId: body.model,
         sanitizedMessages,
@@ -693,6 +697,9 @@ const server = http.createServer(async (req, res) => {
         temperature: body.temperature ?? 0.7,
         chatId,
         thinking: thinkingEnabled,
+        webSearch: webSearchEnabled,
+        supportsTools,
+        searchFn: searchDuckDuckGoHtml,
         signal: upstreamAbort.signal,
         onStatus: (state) => {
           if (!clientClosed) writeSse(res, { type: 'status', state });
