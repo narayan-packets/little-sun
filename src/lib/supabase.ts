@@ -618,4 +618,18 @@ export async function uploadEphemeralFile(
   };
 }
 
+/**
+ * Deletes an uploaded ephemeral file from Supabase Storage once processed by the LLM.
+ */
+export async function deleteEphemeralFile(path: string): Promise<void> {
+  if (!path) return;
+  if (supabase) {
+    try {
+      await supabase.storage.from('chat-uploads').remove([path]);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 

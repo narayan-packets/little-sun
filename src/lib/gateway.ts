@@ -8,6 +8,9 @@ export interface GatewayModel {
   isDefault: boolean;
   contextSize?: number;
   maxTokens?: number;
+  modalities?: string[];
+  supportsImages?: boolean;
+  supportsAudio?: boolean;
 }
 
 const LEGACY_MODEL_OVERRIDES_KEY = 'littlesun_model_overrides_v1';
@@ -30,6 +33,9 @@ export function sanitizeBackendModels(models: GatewayModel[]): GatewayModel[] {
       isDefault: Boolean(m.isDefault),
       contextSize: m.contextSize || 16384,
       maxTokens: m.maxTokens || 4096,
+      modalities: Array.isArray(m.modalities) ? m.modalities : undefined,
+      supportsImages: typeof m.supportsImages === 'boolean' ? m.supportsImages : undefined,
+      supportsAudio: typeof m.supportsAudio === 'boolean' ? m.supportsAudio : undefined,
     }));
 }
 
@@ -403,10 +409,11 @@ export async function streamGatewayChat(params: {
   chatId?: string;
   model: string;
   messages: ChatMessagePayload[];
+  attachments?: Array<{ id: string; name: string; type: string; url: string; storagePath?: string }>;
   signal: AbortSignal;
   onEvent: (event: ChatStreamEvent) => void;
 }): Promise<void> {
-  const { accessToken, chatId, model, messages, signal, onEvent } = params;
+  const { accessToken, chatId, model, messages, attachments, signal, onEvent } = params;
   const gatewayUrl = getGatewayUrl();
 
   const res = await fetch(`${gatewayUrl}/chat`, {
@@ -415,7 +422,7 @@ export async function streamGatewayChat(params: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ chatId, model, messages }),
+    body: JSON.stringify({ chatId, model, messages, attachments }),
     signal,
   });
 

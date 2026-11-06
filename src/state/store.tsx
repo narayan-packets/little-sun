@@ -11,6 +11,7 @@ import {
   type ChatRow,
   createChatRow,
   deleteChatRow,
+  deleteEphemeralFile,
   deleteMessageRow,
   fetchChats,
   fetchMessages,
@@ -93,11 +94,14 @@ import { getModelModalityInfo } from '../lib/modality';
 
 export type LaptopUiStatus = 'offline' | 'sleeping' | 'waking' | 'ready' | 'busy';
 export type AppMode = 'local' | 'cloud';
-export type SettingsRouteSection = 'account' | 'memory' | 'gateway' | 'cloud' | 'voices';
+export type SettingsRouteSection = 'index' | 'account' | 'memory' | 'gateway' | 'cloud' | 'voices';
 
 function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | null {
   const clean = pathname.replace(/\/+$/, '').toLowerCase();
-  if (clean === '/settings' || clean === '/account' || clean === '/settings/account') {
+  if (clean === '/settings') {
+    return 'index';
+  }
+  if (clean === '/account' || clean === '/settings/account') {
     return 'account';
   }
   if (clean === '/memory' || clean === '/settings/memory') {
@@ -116,11 +120,12 @@ function parseSettingsSectionFromPath(pathname: string): SettingsRouteSection | 
 }
 
 function getPathForSettingsSection(section: SettingsRouteSection): string {
-  if (section === 'memory') return '/memory';
-  if (section === 'gateway') return '/gateway';
-  if (section === 'voices') return '/voices';
-  if (section === 'cloud') return '/cloud';
-  return '/account';
+  if (section === 'index') return '/settings';
+  if (section === 'memory') return '/settings/memory';
+  if (section === 'gateway') return '/settings/gateway';
+  if (section === 'voices') return '/settings/voices';
+  if (section === 'cloud') return '/settings/cloud';
+  return '/settings/account';
 }
 
 interface FailedSendState {
@@ -289,6 +294,7 @@ export interface AttachmentItem {
   type: 'text' | 'image' | 'audio';
   dataUrl?: string;
   textContent?: string;
+  storagePath?: string;
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
@@ -327,6 +333,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const setMode = useCallback((nextMode: AppMode) => {
     setModeState(nextMode);
+    if (nextMode === 'cloud') {
+      setIsWebSearchActive(false);
+    }
     try {
       localStorage.setItem('littlesun_mode_v1', nextMode);
     } catch {
@@ -496,8 +505,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [searchCooldown]);
 
   const toggleWebSearch = useCallback(() => {
+    if (mode === 'cloud') return;
     setIsWebSearchActive((prev) => !prev);
-  }, []);
+  }, [mode]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollGatewayRef = useRef<() => Promise<void>>(async () => { });
@@ -562,8 +572,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     (open: boolean) => {
       setIsSettingsOpenState(open);
       if (open) {
-        setSettingsSectionState('account');
-        updateBrowserUrl('/account');
+        setSettingsSectionState('index');
+        updateBrowserUrl('/settings');
       } else {
         const backPath = getActiveChatRoute(activeChatId, chats);
         updateBrowserUrl(backPath);
@@ -1258,7 +1268,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [messages, isStreaming, streamingContent, composerDraft, activeModelMeta]);
 
   const runAssistantStream = useCallback(
-    async (chatId: string, historyForContext: MessageRow[], modelId: string) => {
+    async (
+      chatId: string,
+      historyForContext: MessageRow[],
+      modelId: string,
+      activeAttachments: AttachmentItem[] = []
+    ) => {
       if (!session) return;
 
       const activeList = mode === 'cloud' ? effectiveCloudModels : allModels;
@@ -1494,6 +1509,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             chatId,
             model: modelId,
             messages: gatewayPayload,
+            attachments: activeAttachments.map((a) => ({
+              id: a.id,
+              name: a.name,
+              type: a.type,
+              url: a.dataUrl || '',
+              storagePath: a.storagePath,
+            })),
             signal: controller.signal,
             onEvent: (evt) => {
               if (evt.type === 'status') {
@@ -1605,6 +1627,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (mode === 'local') pollGateway();
         }
       } finally {
+        for (const att of activeAttachments) {
+          if (att.storagePath) {
+            void deleteEphemeralFile(att.storagePath);
+          }
+        }
         isStreamingRef.current = false;
         abortControllerRef.current = null;
         setIsStreaming(false);
@@ -1833,7 +1860,7 @@ Here are generated document files ready for 1-click download:
           return;
         }
 
-        await runAssistantStream(currentChatId, nextMessages, selectedModelId);
+        await runAssistantStream(currentChatId, nextMessages, selectedModelId, attachments);
       } catch (err) {
         setComposerDraft(rawText);
         setFailedSend({

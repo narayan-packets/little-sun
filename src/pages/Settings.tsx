@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Brain,
   Check,
+  ChevronRight,
   Cloud,
   Eye,
   EyeOff,
@@ -298,16 +299,7 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const currentTab =
-    settingsSection === 'voices'
-      ? 'voices'
-      : settingsSection === 'cloud'
-      ? 'cloud'
-      : settingsSection === 'gateway'
-      ? 'gateway'
-      : settingsSection === 'memory'
-      ? 'memory'
-      : 'account';
+  const currentTab = settingsSection || 'index';
   const canAddMoreKeys = cloudConfig.keys.length < MAX_API_KEYS;
 
   return (
@@ -320,59 +312,117 @@ export const SettingsPage: React.FC = () => {
       }}
     >
       {/* Top Header Bar */}
-      <header
-        className="px-3.5 sm:px-6 border-b flex items-center justify-between gap-3 shrink-0"
-        style={{
-          backgroundColor: 'var(--bg)',
-          borderColor: 'var(--border)',
-          minHeight: '3.5rem',
-          paddingTop: 'env(safe-area-inset-top, 0px)',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setIsSettingsOpen(false)}
-          className="min-h-[40px] px-2.5 py-1.5 inline-flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.98]"
+      {currentTab === 'index' ? (
+        <header
+          className="px-3.5 sm:px-6 border-b flex items-center justify-between gap-3 shrink-0"
           style={{
-            color: 'var(--text)',
-            borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'var(--bg)',
+            borderColor: 'var(--border)',
+            minHeight: '3.5rem',
+            paddingTop: 'env(safe-area-inset-top, 0px)',
           }}
-          aria-label="Back to chat (Esc)"
-          title="Back to chat (Esc)"
         >
-          <ArrowLeft className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
-          <span>
-            Back<span className="hidden sm:inline"> to chat</span>
-          </span>
-          <kbd
-            className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono border select-none ml-0.5"
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(false)}
+            className="min-h-[40px] px-2.5 py-1.5 inline-flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.98]"
             style={{
-              borderColor: 'var(--border)',
-              backgroundColor: 'var(--surface-2)',
-              color: 'var(--text-muted)',
-              borderRadius: '4px',
+              color: 'var(--text)',
+              borderRadius: 'var(--radius-sm)',
             }}
+            aria-label="Back to chat (Esc)"
+            title="Back to chat (Esc)"
           >
-            Esc
-          </kbd>
-        </button>
+            <ArrowLeft className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
+            <span>
+              Back<span className="hidden sm:inline"> to chat</span>
+            </span>
+            <kbd
+              className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono border select-none ml-0.5"
+              style={{
+                borderColor: 'var(--border)',
+                backgroundColor: 'var(--surface-2)',
+                color: 'var(--text-muted)',
+                borderRadius: '4px',
+              }}
+            >
+              Esc
+            </kbd>
+          </button>
 
-        {/* Mobile Page Title */}
-        <h1
-          className="text-sm font-semibold sm:hidden truncate"
-          style={{ color: 'var(--text)' }}
+          <h1
+            className="text-sm sm:text-base font-semibold truncate"
+            style={{ color: 'var(--text)' }}
+          >
+            Settings
+          </h1>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <StatusPill />
+          </div>
+        </header>
+      ) : (
+        <header
+          className="px-3.5 sm:px-6 border-b flex items-center justify-between gap-3 shrink-0"
+          style={{
+            backgroundColor: 'var(--bg)',
+            borderColor: 'var(--border)',
+            minHeight: '3.5rem',
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+          }}
         >
-          Settings
-        </h1>
+          {/* Breadcrumb Navigation: Settings > Section */}
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => openSettingsSection('index')}
+              className="min-h-[38px] px-2 py-1.5 inline-flex items-center gap-1 text-xs sm:text-sm font-medium transition-colors cursor-pointer hover:bg-[var(--surface-2)] rounded-md active:scale-[0.98]"
+              style={{ color: 'var(--text-muted)' }}
+              title="Return to Settings overview"
+            >
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <span>Settings</span>
+            </button>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <StatusPill />
-        </div>
-      </header>
+            <span className="text-[var(--text-muted)] text-xs font-mono select-none">/</span>
+
+            <span
+              className="text-xs sm:text-sm font-semibold truncate capitalize"
+              style={{ color: 'var(--text)' }}
+            >
+              {currentTab === 'cloud'
+                ? 'Cloud API'
+                : currentTab === 'gateway'
+                ? 'Gateway'
+                : currentTab === 'voices'
+                ? 'Voices'
+                : currentTab === 'memory'
+                ? 'Memory'
+                : 'Account'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(false)}
+              className="min-h-[34px] px-2.5 py-1 text-xs font-medium border transition-colors cursor-pointer hover:bg-[var(--surface-2)] rounded-md"
+              style={{
+                borderColor: 'var(--border)',
+                color: 'var(--text-muted)',
+              }}
+              title="Back to chat"
+            >
+              Chat
+            </button>
+            <StatusPill />
+          </div>
+        </header>
+      )}
 
       {/* Main Content */}
       <main
-        className="flex-1 overflow-y-auto px-4 sm:px-6 pt-5 sm:pt-8 pb-12 sm:pb-16"
+        className="flex-1 overflow-y-auto px-4 sm:px-6 pt-5 sm:pt-7 pb-12 sm:pb-16"
         style={{
           WebkitOverflowScrolling: 'touch',
           overscrollBehaviorY: 'contain',
@@ -380,129 +430,165 @@ export const SettingsPage: React.FC = () => {
         }}
       >
         <div className="w-full max-w-[500px] mx-auto">
-          {/* Centered Segmented Navigation (Account | Memory | Gateway | Cloud | Voices) */}
-          <div className="flex justify-center mb-6 sm:mb-8">
-            <nav
-              aria-label="Settings navigation"
-              className="w-full max-w-[520px] flex items-center justify-between p-1 border select-none rounded-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{
-                backgroundColor: 'var(--surface-2)',
-                borderColor: 'var(--border)',
-              }}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={currentTab === 'account'}
-                onClick={() => openSettingsSection('account')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  currentTab === 'account'
-                    ? 'shadow-xs font-semibold'
-                    : 'hover:text-[var(--text)]'
-                }`}
-                style={{
-                  backgroundColor: currentTab === 'account' ? 'var(--surface)' : 'transparent',
-                  color: currentTab === 'account' ? 'var(--text)' : 'var(--text-muted)',
-                }}
-              >
-                <User
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: currentTab === 'account' ? 'var(--accent)' : 'inherit' }}
-                />
-                <span>Account</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                aria-selected={currentTab === 'memory'}
-                onClick={() => openSettingsSection('memory')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  currentTab === 'memory'
-                    ? 'shadow-xs font-semibold'
-                    : 'hover:text-[var(--text)]'
-                }`}
-                style={{
-                  backgroundColor: currentTab === 'memory' ? 'var(--surface)' : 'transparent',
-                  color: currentTab === 'memory' ? 'var(--text)' : 'var(--text-muted)',
-                }}
-              >
-                <Brain
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: currentTab === 'memory' ? 'var(--accent)' : 'inherit' }}
-                />
-                <span>Memory</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                aria-selected={currentTab === 'gateway'}
-                onClick={() => openSettingsSection('gateway')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  currentTab === 'gateway'
-                    ? 'shadow-xs font-semibold'
-                    : 'hover:text-[var(--text)]'
-                }`}
-                style={{
-                  backgroundColor: currentTab === 'gateway' ? 'var(--surface)' : 'transparent',
-                  color: currentTab === 'gateway' ? 'var(--text)' : 'var(--text-muted)',
-                }}
-              >
-                <Server
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: currentTab === 'gateway' ? 'var(--accent)' : 'inherit' }}
-                />
-                <span>Gateway</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                aria-selected={currentTab === 'cloud'}
-                onClick={() => openSettingsSection('cloud')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  currentTab === 'cloud'
-                    ? 'shadow-xs font-semibold'
-                    : 'hover:text-[var(--text)]'
-                }`}
-                style={{
-                  backgroundColor: currentTab === 'cloud' ? 'var(--surface)' : 'transparent',
-                  color: currentTab === 'cloud' ? 'var(--text)' : 'var(--text-muted)',
-                }}
-              >
-                <Cloud
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: currentTab === 'cloud' ? 'var(--accent)' : 'inherit' }}
-                />
-                <span>Cloud</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                aria-selected={currentTab === 'voices'}
-                onClick={() => openSettingsSection('voices')}
-                className={`flex-1 min-h-[36px] sm:min-h-[38px] px-1.5 sm:px-2.5 py-1.5 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11.5px] sm:text-sm font-medium rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
-                  currentTab === 'voices'
-                    ? 'shadow-xs font-semibold'
-                    : 'hover:text-[var(--text)]'
-                }`}
-                style={{
-                  backgroundColor: currentTab === 'voices' ? 'var(--surface)' : 'transparent',
-                  color: currentTab === 'voices' ? 'var(--text)' : 'var(--text-muted)',
-                }}
-              >
-                <Volume2
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: currentTab === 'voices' ? 'var(--accent)' : 'inherit' }}
-                />
-                <span>Voices</span>
-              </button>
-            </nav>
-          </div>
-
           <AnimatePresence mode="wait">
+            {/* ======================================================== */}
+            {/* DEDICATED SETTINGS MENU HUB / DIRECTORY                  */}
+            {/* ======================================================== */}
+            {currentTab === 'index' && (
+              <motion.div
+                key="settings-index"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16 }}
+                className="space-y-3"
+              >
+                <div
+                  className="border overflow-hidden divide-y shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  {/* Dedicated Item 1: Voices */}
+                  <button
+                    type="button"
+                    onClick={() => openSettingsSection('voices')}
+                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                        <Volume2 className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          Voices
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] truncate">
+                          Text-to-speech voice, speaking speed & preview
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline capitalize">
+                        {voice} · {speed}x
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+                    </div>
+                  </button>
+
+                  {/* Dedicated Item 2: Gateway */}
+                  <button
+                    type="button"
+                    onClick={() => openSettingsSection('gateway')}
+                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                        <Server className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          Gateway
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] truncate">
+                          Local models, Tailscale Funnel & connection status
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline capitalize">
+                        {laptopStatus}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+                    </div>
+                  </button>
+
+                  {/* Dedicated Item 3: Cloud API */}
+                  <button
+                    type="button"
+                    onClick={() => openSettingsSection('cloud')}
+                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-sky-500/10 text-sky-500 border border-sky-500/20">
+                        <Cloud className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          Cloud API
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] truncate">
+                          BYOK provider keys (OpenRouter, Groq, Ollama, OpenAI)
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline">
+                        {cloudConfig.keys.length} key{cloudConfig.keys.length === 1 ? '' : 's'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+                    </div>
+                  </button>
+
+                  {/* Dedicated Item 4: Memory */}
+                  <button
+                    type="button"
+                    onClick={() => openSettingsSection('memory')}
+                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-violet-500/10 text-violet-500 border border-violet-500/20">
+                        <Brain className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          Memory
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] truncate">
+                          Manage persistent facts and autonomous memory retention
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline">
+                        {isMemoryEnabled ? 'ON' : 'OFF'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+                    </div>
+                  </button>
+
+                  {/* Dedicated Item 5: Account */}
+                  <button
+                    type="button"
+                    onClick={() => openSettingsSection('account')}
+                    className="w-full p-4 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)] active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                        <User className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          Account
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] truncate">
+                          Profile name and authentication details
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-muted)] bg-[var(--surface-2)] hidden sm:inline">
+                        {userDisplayName}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" />
+                    </div>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* ======================================================== */}
             {/* TAB 1: Account                                           */}
             {/* ======================================================== */}

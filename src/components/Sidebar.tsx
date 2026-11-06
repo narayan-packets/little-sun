@@ -56,6 +56,7 @@ export const Sidebar: React.FC = () => {
     setIsSidebarOpen,
     toggleDesktopSidebar,
     setIsSettingsOpen,
+    openSettingsSection,
     selectChat,
     startNewChat,
     renameChat,
@@ -301,7 +302,7 @@ export const Sidebar: React.FC = () => {
       {/* Top Header: Brand + Collapse + New Chat + Filter */}
       <div className="p-3 pb-2 space-y-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between px-1">
-          <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text)' }}>
+          <span className="text-base font-bold tracking-tight" style={{ color: 'var(--text)' }}>
             Little Sun
           </span>
 
@@ -410,7 +411,7 @@ export const Sidebar: React.FC = () => {
           type="button"
           onClick={() => {
             setIsSidebarOpen(false);
-            setIsSettingsOpen(true);
+            openSettingsSection('index');
           }}
           className="w-full min-h-[44px] px-2.5 py-2 flex items-center justify-between gap-2.5 transition-colors cursor-pointer"
           style={{

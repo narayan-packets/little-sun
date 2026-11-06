@@ -89,9 +89,8 @@ export const ModelPicker: React.FC = () => {
         </span>
 
         <ChevronDown
-          className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 opacity-60 ${
-            open ? 'rotate-180' : ''
-          }`}
+          className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 opacity-60 ${open ? 'rotate-180' : ''
+            }`}
         />
       </button>
 
@@ -121,11 +120,10 @@ export const ModelPicker: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setMode('local')}
-                className={`min-h-[32px] px-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
-                  mode === 'local'
-                    ? 'bg-[var(--surface)] text-[var(--text)] shadow-xs font-semibold'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-                }`}
+                className={`min-h-[32px] px-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${mode === 'local'
+                  ? 'bg-[var(--surface)] text-[var(--text)] shadow-xs font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                  }`}
               >
                 <Zap className="w-3 h-3 text-[var(--accent)]" />
                 <span>Local Mode</span>
@@ -134,11 +132,10 @@ export const ModelPicker: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setMode('cloud')}
-                className={`min-h-[32px] px-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
-                  mode === 'cloud'
-                    ? 'bg-[var(--surface)] text-[var(--text)] shadow-xs font-semibold'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-                }`}
+                className={`min-h-[32px] px-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${mode === 'cloud'
+                  ? 'bg-[var(--surface)] text-[var(--text)] shadow-xs font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                  }`}
               >
                 <Cloud className="w-3 h-3 text-[var(--accent)]" />
                 <span>Cloud API</span>

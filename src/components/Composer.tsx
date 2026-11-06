@@ -7,7 +7,7 @@ import {
   Clock,
   FileText,
   Globe,
-  MoreHorizontal,
+  MoreVertical,
   Paperclip,
   Plus,
   RotateCcw,
@@ -41,6 +41,7 @@ export interface ComposerProps {
 export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   const {
     session,
+    models,
     selectedModelId,
     activeChatId,
     composerDraft,
@@ -71,8 +72,19 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const modelInfo = useMemo(() => getModelModalityInfo(selectedModelId), [selectedModelId]);
+  const activeModel = models.find((m) => m.id === selectedModelId);
+  const modelInfo = useMemo(
+    () => getModelModalityInfo(selectedModelId, activeModel?.name, activeModel),
+    [selectedModelId, activeModel]
+  );
   const [isModalityDismissed, setIsModalityDismissed] = useState(false);
+
+  // Clear attachments if switching to Cloud mode
+  useEffect(() => {
+    if (mode === 'cloud' && attachments.length > 0) {
+      setAttachments([]);
+    }
+  }, [mode, attachments.length]);
 
   // Reset modality warning dismissal if user adds or changes attachments
   useEffect(() => {
@@ -85,13 +97,13 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   const unsupportedModalityMessage = useMemo(() => {
     if (isModalityDismissed) return null;
     if (hasImageAttachment && !modelInfo.supportsImages && hasAudioAttachment && !modelInfo.supportsAudio) {
-      return 'The active model does not support image or audio inputs. Switch to a multimodal model (e.g. Gemma 4, Qwen-Omni) to process these attachments.';
+      return 'Model only supports text. Switch to a multimodal model for images and audio.';
     }
     if (hasImageAttachment && !modelInfo.supportsImages) {
-      return 'The active model is text-only. Switch to a vision-capable model (e.g. Qwen-VL, Gemma 4, GPT-4o) to analyze images.';
+      return 'Model only supports text. Switch to a vision-capable model to analyze images.';
     }
     if (hasAudioAttachment && !modelInfo.supportsAudio) {
-      return 'The active model does not support audio inputs. Switch to an audio-capable model (e.g. Qwen-Audio, Gemma 4, Whisper) to process voice tracks.';
+      return 'Model does not support audio inputs.';
     }
     return null;
   }, [isModalityDismissed, hasImageAttachment, hasAudioAttachment, modelInfo]);
@@ -156,6 +168,12 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   }
 
   const validateAndProcessFile = async (file: File): Promise<AttachmentItem | null> => {
+    // File upload is disabled in Cloud mode
+    if (mode === 'cloud') {
+      setUploadError('File upload is disabled in Cloud mode.');
+      return null;
+    }
+
     // 1. Strict size check under 30 MB
     if (file.size > MAX_FILE_SIZE_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
@@ -180,6 +198,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
         size: file.size,
         type: 'audio',
         dataUrl: uploadRes.url,
+        storagePath: uploadRes.path,
       };
     }
 
@@ -194,6 +213,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
         size: file.size,
         type: 'image',
         dataUrl: uploadRes.url,
+        storagePath: uploadRes.path,
       };
     }
 
@@ -245,6 +265,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
         type: 'text',
         textContent,
         dataUrl: uploadRes.url,
+        storagePath: uploadRes.path,
       };
     }
 
@@ -277,7 +298,7 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isInputBlocked) return;
+    if (isInputBlocked || mode === 'cloud') return;
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
     setUploadError(null);
@@ -674,128 +695,126 @@ export const Composer: React.FC<ComposerProps> = ({ isHero = false }) => {
           </AnimatePresence>
 
           {/* Main Input Row - Well-positioned icons matching composer height and width */}
-          <div
-            className={`flex ${
-              composerDraft.includes('\n') ? 'items-end' : 'items-center'
-            } gap-1.5 sm:gap-2 w-full`}
-          >
-            {/* 3-Dot Options Dropdown (Attach File & Web Search) */}
-            <div ref={menuRef} className="relative shrink-0 flex items-center">
-              <button
-                type="button"
-                disabled={isInputBlocked}
-                onClick={() => setIsMenuOpen((prev) => !prev)}
-                className="h-9 w-9 sm:h-9.5 sm:w-9.5 inline-flex items-center justify-center rounded-full transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 relative"
-                style={{
-                  color: isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)',
-                  backgroundColor: isMenuOpen ? 'var(--surface-2)' : 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--text)';
-                  e.currentTarget.style.backgroundColor = 'var(--surface-2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color =
-                    isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)';
-                  e.currentTarget.style.backgroundColor = isMenuOpen ? 'var(--surface-2)' : 'transparent';
-                }}
-                title="Options (Attach file, Web search)"
-                aria-label="Options"
-              >
-                <MoreHorizontal className="w-4.5 h-4.5" />
-                {isWebSearchActive && (
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface)]" />
-                )}
-              </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full">
+            {/* 3-Dot Options Dropdown (Attach File & Web Search - Local Mode only) */}
+            {mode === 'local' && (
+              <div ref={menuRef} className="relative shrink-0 flex items-center self-center">
+                <button
+                  type="button"
+                  disabled={isInputBlocked}
+                  onClick={() => setIsMenuOpen((prev) => !prev)}
+                  className="h-9 w-9 sm:h-9.5 sm:w-9.5 inline-flex items-center justify-center rounded-full transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 relative"
+                  style={{
+                    color: isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)',
+                    backgroundColor: isMenuOpen ? 'var(--surface-2)' : 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = 'var(--text)';
+                    e.currentTarget.style.backgroundColor = 'var(--surface-2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color =
+                      isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)';
+                    e.currentTarget.style.backgroundColor = isMenuOpen ? 'var(--surface-2)' : 'transparent';
+                  }}
+                  title="Options (Attach file, Web search)"
+                  aria-label="Options"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                  {isWebSearchActive && (
+                    <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface)]" />
+                  )}
+                </button>
 
-              {/* Floating Dropdown Popover (Minimal, clean, no awkward descriptions) */}
-              <AnimatePresence>
-                {isMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                    transition={{ duration: 0.14 }}
-                    className="absolute left-0 bottom-full mb-2 w-56 p-1 rounded-2xl border shadow-xl z-50 select-none backdrop-blur-md"
-                    style={{
-                      backgroundColor: 'var(--surface)',
-                      borderColor: 'var(--border)',
-                    }}
-                  >
-                    {/* Item 1: Attach File */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        fileInputRef.current?.click();
+                {/* Floating Dropdown Popover */}
+                <AnimatePresence>
+                  {isMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                      transition={{ duration: 0.14 }}
+                      className="absolute left-0 bottom-full mb-2 w-56 p-1 rounded-2xl border shadow-xl z-50 select-none backdrop-blur-md"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        borderColor: 'var(--border)',
                       }}
-                      className="w-full px-3 py-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <Paperclip className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-                        <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
-                          Attach file
-                        </span>
-                      </div>
-                      <span
-                        className="text-[10px] px-1.5 py-0.5 rounded font-mono"
-                        style={{
-                          backgroundColor: 'var(--surface-2)',
-                          color: 'var(--text-muted)',
+                      {/* Item 1: Attach File */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          fileInputRef.current?.click();
                         }}
+                        className="w-full px-3 py-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
                       >
-                        &lt; 30 MB
-                      </span>
-                    </button>
-
-                    <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
-
-                    {/* Item 2: Web Search */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        toggleWebSearch();
-                      }}
-                      className="w-full px-3 py-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Globe
-                          className="w-4 h-4"
-                          style={{
-                            color: isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)',
-                          }}
-                        />
-                        <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
-                          Web search
-                        </span>
-                      </div>
-
-                      {searchCooldown > 0 ? (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
-                          {searchCooldown}s
-                        </span>
-                      ) : (
+                        <div className="flex items-center gap-2.5">
+                          <Paperclip className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                          <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
+                            Attach file
+                          </span>
+                        </div>
                         <span
-                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors"
+                          className="text-[10px] px-1.5 py-0.5 rounded font-mono"
                           style={{
-                            backgroundColor: isWebSearchActive ? 'var(--accent)' : 'var(--surface-2)',
-                            borderColor: isWebSearchActive ? 'var(--accent)' : 'var(--border)',
-                            color: isWebSearchActive ? 'var(--accent-contrast)' : 'var(--text-muted)',
+                            backgroundColor: 'var(--surface-2)',
+                            color: 'var(--text-muted)',
                           }}
                         >
-                          {isWebSearchActive ? 'ON' : 'OFF'}
+                          &lt; 30 MB
                         </span>
-                      )}
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                      </button>
 
-            {/* Active Web Search Badge or Cooldown pill placed right next to 3-dot at start of composer */}
-            {isWebSearchActive && (
+                      <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
+
+                      {/* Item 2: Web Search */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          toggleWebSearch();
+                        }}
+                        className="w-full px-3 py-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[var(--surface-2)]"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Globe
+                            className="w-4 h-4"
+                            style={{
+                              color: isWebSearchActive ? 'var(--accent)' : 'var(--text-muted)',
+                            }}
+                          />
+                          <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
+                            Web search
+                          </span>
+                        </div>
+
+                        {searchCooldown > 0 ? (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
+                            {searchCooldown}s
+                          </span>
+                        ) : (
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors"
+                            style={{
+                              backgroundColor: isWebSearchActive ? 'var(--accent)' : 'var(--surface-2)',
+                              borderColor: isWebSearchActive ? 'var(--accent)' : 'var(--border)',
+                              color: isWebSearchActive ? 'var(--accent-contrast)' : 'var(--text-muted)',
+                            }}
+                          >
+                            {isWebSearchActive ? 'ON' : 'OFF'}
+                          </span>
+                        )}
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* Active Web Search Badge centered right after 3-dot menu */}
+            {mode === 'local' && isWebSearchActive && (
               <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 transition-all select-none shadow-2xs self-center"
                 style={{
                   backgroundColor: 'var(--surface-2)',
                   borderColor: 'var(--border)',

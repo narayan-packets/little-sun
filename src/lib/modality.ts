@@ -8,11 +8,58 @@ export interface ModelCapabilityInfo {
   hint?: string;
 }
 
+export interface ModelCapabilitySource {
+  id?: string;
+  name?: string;
+  modalities?: string[];
+  supportsImages?: boolean;
+  supportsAudio?: boolean;
+  modality?: string;
+}
+
 /**
- * Inspects a model ID and name to determine supported modalities
- * (Vision LLM, Audio LLM, Full Multimodal, Standard Chat LLM, or Image Generation).
+ * Inspects a model ID and configuration (from models.json or Cloud) to determine supported modalities.
+ * When the user manually defines `modalities` in models.json, it takes top priority.
  */
-export function getModelModalityInfo(modelId: string, modelName?: string): ModelCapabilityInfo {
+export function getModelModalityInfo(
+  modelId: string,
+  modelName?: string,
+  modelSource?: ModelCapabilitySource
+): ModelCapabilityInfo {
+  // 1. Explicit user-managed configuration in models.json
+  if (modelSource?.modalities && Array.isArray(modelSource.modalities)) {
+    const mods = modelSource.modalities.map((x) => String(x).toLowerCase().trim());
+    const supportsImages = mods.includes('image') || mods.includes('vision');
+    const supportsAudio = mods.includes('audio');
+    let modality: ModelModality = 'chat';
+    if (supportsImages && supportsAudio) modality = 'multimodal';
+    else if (supportsImages) modality = 'vision';
+    else if (supportsAudio) modality = 'audio';
+
+    return {
+      modality,
+      supportsChat: true,
+      supportsImages,
+      supportsAudio,
+    };
+  }
+
+  if (typeof modelSource?.supportsImages === 'boolean' || typeof modelSource?.supportsAudio === 'boolean') {
+    const supportsImages = Boolean(modelSource?.supportsImages);
+    const supportsAudio = Boolean(modelSource?.supportsAudio);
+    let modality: ModelModality = 'chat';
+    if (supportsImages && supportsAudio) modality = 'multimodal';
+    else if (supportsImages) modality = 'vision';
+    else if (supportsAudio) modality = 'audio';
+
+    return {
+      modality,
+      supportsChat: true,
+      supportsImages,
+      supportsAudio,
+    };
+  }
+
   const m = `${modelId} ${modelName || ''}`.toLowerCase();
 
   // 1. Image Generation Models (Diffusion, Flux, DALL-E, Midjourney)
