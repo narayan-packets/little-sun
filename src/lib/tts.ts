@@ -150,6 +150,22 @@ class SingleAudioQueuePlayer {
   private sessionCache = new Map<string, string[]>();
   private segmentCache = new Map<string, string>();
 
+  private setSessionCache(key: string, chunks: string[]) {
+    if (this.sessionCache.size >= 25) {
+      const oldestKey = this.sessionCache.keys().next().value;
+      if (oldestKey !== undefined) this.sessionCache.delete(oldestKey);
+    }
+    this.sessionCache.set(key, chunks);
+  }
+
+  private setSegmentCache(key: string, chunk: string) {
+    if (this.segmentCache.size >= 50) {
+      const oldestKey = this.segmentCache.keys().next().value;
+      if (oldestKey !== undefined) this.segmentCache.delete(oldestKey);
+    }
+    this.segmentCache.set(key, chunk);
+  }
+
   getSnapshot(): TtsQueueSnapshot {
     return {
       activeMessageId: this.activeMessageId,
@@ -201,6 +217,8 @@ class SingleAudioQueuePlayer {
     this.streamFinished = true;
 
     if (this.audioEl) {
+      this.audioEl.onended = null;
+      this.audioEl.onerror = null;
       try {
         this.audioEl.pause();
         this.audioEl.removeAttribute('src');
@@ -357,7 +375,7 @@ class SingleAudioQueuePlayer {
 
       this.streamFinished = true;
       if (collectedChunks.length > 0 && !controller.signal.aborted) {
-        this.sessionCache.set(messageCacheKey, collectedChunks);
+        this.setSessionCache(messageCacheKey, collectedChunks);
       }
 
       if (!this.isPlayingChunk && this.chunkQueue.length === 0) {
@@ -413,7 +431,7 @@ class SingleAudioQueuePlayer {
 
         const blob = await res.blob();
         dataUrl = await blobToDataUrl(blob);
-        this.segmentCache.set(segKey, dataUrl);
+        this.setSegmentCache(segKey, dataUrl);
       }
 
       if (signal.aborted || this.activeMessageId !== messageId) return;
@@ -424,7 +442,7 @@ class SingleAudioQueuePlayer {
 
     this.streamFinished = true;
     if (collectedChunks.length > 0 && !signal.aborted) {
-      this.sessionCache.set(messageCacheKey, collectedChunks);
+      this.setSessionCache(messageCacheKey, collectedChunks);
     }
 
     if (!this.isPlayingChunk && this.chunkQueue.length === 0) {
@@ -460,11 +478,13 @@ class SingleAudioQueuePlayer {
     this.applyPreservesPitch(el);
 
     el.onended = () => {
+      if (this.activeMessageId !== messageId) return;
       this.isPlayingChunk = false;
       this.pumpAudioQueue(messageId);
     };
 
     el.onerror = () => {
+      if (this.activeMessageId !== messageId) return;
       this.isPlayingChunk = false;
       this.activeMessageId = null;
       this.state = 'idle';
@@ -474,6 +494,7 @@ class SingleAudioQueuePlayer {
     };
 
     el.play().catch(() => {
+      if (this.activeMessageId !== messageId) return;
       this.isPlayingChunk = false;
       this.activeMessageId = null;
       this.state = 'idle';

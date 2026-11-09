@@ -12,12 +12,12 @@ let supervisorTimer = null;
 
 // In-memory audio cache for the session (key: `${voice}:${text}` -> Buffer)
 const audioCache = new Map();
-const MAX_CACHE_ENTRIES = 120;
+const MAX_CACHE_ENTRIES = 30;
 
 function cacheAudio(key, buf) {
   if (audioCache.size >= MAX_CACHE_ENTRIES) {
     const oldestKey = audioCache.keys().next().value;
-    if (oldestKey) audioCache.delete(oldestKey);
+    if (oldestKey !== undefined) audioCache.delete(oldestKey);
   }
   audioCache.set(key, buf);
 }
@@ -275,15 +275,19 @@ export async function proxyTtsStream(ttsBaseUrl, { text, voice }, _req, res) {
       );
     }
 
-    if (!clientClosed) {
+    if (!clientClosed && !res.writableEnded && !res.destroyed) {
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
     }
-    res.end();
-  } catch (err) {
-    if (!clientClosed) {
-      logger.log('ERR', `TTS stream error: ${err.message}`);
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'TTS synthesis interrupted' })}\n\n`);
+    if (!res.writableEnded) {
       res.end();
+    }
+  } catch (err) {
+    if (!clientClosed && !res.writableEnded && !res.destroyed) {
+      logger.log('ERR', `TTS stream error: ${err.message}`);
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'TTS synthesis interrupted' })}\n\n`);
+      } catch {}
+      if (!res.writableEnded) res.end();
     }
   }
 }

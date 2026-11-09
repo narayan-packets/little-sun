@@ -69,7 +69,7 @@ async function startServer() {
   });
 
   // Streaming reverse proxy to the active laptop gateway (/gateway-proxy/*)
-  app.use('/gateway-proxy', express.raw({ type: '*/*', limit: '2mb' }), async (req, res) => {
+  app.use('/gateway-proxy', express.raw({ type: '*/*', limit: '50mb' }), async (req, res) => {
     const subPath = req.url || '/';
     const targetUrl = `${activeGatewayUrl}${subPath}`;
 
@@ -79,6 +79,14 @@ async function startServer() {
         abortController.abort();
       }
     });
+
+    const isFastProbe = subPath === '/health' || subPath.startsWith('/health');
+    const probeTimeout = setTimeout(
+      () => {
+        abortController.abort();
+      },
+      isFastProbe ? 4000 : 30000
+    );
 
     try {
       const headers: Record<string, string> = {};
@@ -95,21 +103,17 @@ async function startServer() {
         Buffer.isBuffer(req.body) &&
         req.body.length > 0;
 
-      const isFastProbe = subPath === '/health' || subPath.startsWith('/health');
-      const probeTimeout = setTimeout(
-        () => {
-          if (isFastProbe) abortController.abort();
-        },
-        isFastProbe ? 4000 : 30000
-      );
-
-      const upstream = await fetch(targetUrl, {
-        method: req.method,
-        headers,
-        body: hasBody ? req.body : undefined,
-        signal: abortController.signal,
-      });
-      clearTimeout(probeTimeout);
+      let upstream: Response;
+      try {
+        upstream = await fetch(targetUrl, {
+          method: req.method,
+          headers,
+          body: hasBody ? req.body : undefined,
+          signal: abortController.signal,
+        });
+      } finally {
+        clearTimeout(probeTimeout);
+      }
 
       res.status(upstream.status);
 
@@ -127,18 +131,38 @@ async function startServer() {
 
       // Stream chunks immediately without buffering (critical for SSE /chat and /tts/stream)
       const reader = upstream.body.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(Buffer.from(value));
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(Buffer.from(value));
+        }
+      } finally {
+        try {
+          await reader.cancel();
+        } catch {
+          // ignore stream close error
+        }
       }
       res.end();
     } catch {
+      clearTimeout(probeTimeout);
       if (!res.headersSent) {
         res.status(502).json({ error: 'gateway_unreachable' });
       } else if (!res.writableEnded) {
         res.end();
       }
+    }
+  });
+
+  // Global Express error handler for payload limits and unexpected exceptions
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (err?.type === 'entity.too.large') {
+      res.status(413).json({ error: 'payload_too_large', message: 'Attachment exceeds maximum size limit (50MB)' });
+      return;
+    }
+    if (!res.headersSent) {
+      res.status(err?.status || 500).json({ error: err?.message || 'internal_server_error' });
     }
   });
 

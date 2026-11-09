@@ -1688,21 +1688,28 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             status: finalStatus,
             modelId,
           });
-          isStreamingRef.current = false;
-          setIsStreaming(false);
-          setStreamingStage('idle');
-          setStreamingContent('');
-          setStreamingThinking('');
-          setMessages((prev) => [...prev, savedAssistant]);
 
-          const updatedChat = await touchChatRow(session.user.id, chatId, { model_id: modelId });
-          setChats((prev) =>
-            [updatedChat, ...prev.filter((c) => c.id !== chatId)].sort(
-              (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-            )
-          );
+          if (latestSelectedChatRef.current === chatId) {
+            isStreamingRef.current = false;
+            setIsStreaming(false);
+            setStreamingStage('idle');
+            setStreamingContent('');
+            setStreamingThinking('');
+            setMessages((prev) => [...prev, savedAssistant]);
+          }
+
+          try {
+            const updatedChat = await touchChatRow(session.user.id, chatId, { model_id: modelId });
+            setChats((prev) =>
+              [updatedChat, ...prev.filter((c) => c.id !== chatId)].sort(
+                (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+              )
+            );
+          } catch {
+            // Non-fatal
+          }
         }
-        if (mode === 'local') {
+        if (mode === 'local' && latestSelectedChatRef.current === chatId) {
           setLaptopStatus('ready');
         }
       } catch (err) {
@@ -1727,13 +1734,15 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             status: 'stopped',
             modelId,
           });
-          isStreamingRef.current = false;
-          setIsStreaming(false);
-          setStreamingStage('idle');
-          setStreamingContent('');
-          setStreamingThinking('');
-          setMessages((prev) => [...prev, savedStopped]);
-          if (mode === 'local') setLaptopStatus('ready');
+          if (latestSelectedChatRef.current === chatId) {
+            isStreamingRef.current = false;
+            setIsStreaming(false);
+            setStreamingStage('idle');
+            setStreamingContent('');
+            setStreamingThinking('');
+            setMessages((prev) => [...prev, savedStopped]);
+            if (mode === 'local') setLaptopStatus('ready');
+          }
         } else if (err instanceof GatewayForbiddenError) {
           setIsAccessRestricted(true);
         } else if (err instanceof GatewayBusyError) {
@@ -1752,12 +1761,14 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               status: 'error',
               modelId,
             });
-            isStreamingRef.current = false;
-            setIsStreaming(false);
-            setStreamingStage('idle');
-            setStreamingContent('');
-            setStreamingThinking('');
-            setMessages((prev) => [...prev, savedErr]);
+            if (latestSelectedChatRef.current === chatId) {
+              isStreamingRef.current = false;
+              setIsStreaming(false);
+              setStreamingStage('idle');
+              setStreamingContent('');
+              setStreamingThinking('');
+              setMessages((prev) => [...prev, savedErr]);
+            }
           } else {
             const message = err instanceof Error ? err.message : 'Connection failed.';
             setFailedSend((prev) => ({
@@ -1768,17 +1779,14 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (mode === 'local') pollGateway();
         }
       } finally {
-        for (const att of activeAttachments) {
-          if (att.storagePath) {
-            void deleteEphemeralFile(att.storagePath);
-          }
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+          isStreamingRef.current = false;
+          setIsStreaming(false);
+          setStreamingStage('idle');
+          setStreamingContent('');
+          setStreamingThinking('');
         }
-        isStreamingRef.current = false;
-        abortControllerRef.current = null;
-        setIsStreaming(false);
-        setStreamingStage('idle');
-        setStreamingContent('');
-        setStreamingThinking('');
       }
     },
     [
@@ -1882,9 +1890,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           currentChatId = created.id;
           latestSelectedChatRef.current = created.id;
           setActiveChatId(created.id);
-          const nextChats = [created, ...chats];
-          setChats(nextChats);
-          updateBrowserUrl(getChatRoutePath(created, nextChats));
+          setChats((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+          updateBrowserUrl(getChatRoutePath(created, [created, ...chats]));
           currentMessages = [];
         }
 
@@ -1900,14 +1907,18 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const nextMessages = [...currentMessages, userMsg];
         setMessages(nextMessages);
 
-        const updatedChat = await touchChatRow(session.user.id, currentChatId, {
-          model_id: selectedModelId,
-        });
-        setChats((prev) =>
-          [updatedChat, ...prev.filter((c) => c.id !== currentChatId)].sort(
-            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-          )
-        );
+        try {
+          const updatedChat = await touchChatRow(session.user.id, currentChatId, {
+            model_id: selectedModelId,
+          });
+          setChats((prev) =>
+            [updatedChat, ...prev.filter((c) => c.id !== currentChatId)].sort(
+              (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            )
+          );
+        } catch {
+          // Non-fatal metadata sync: continue to generation
+        }
 
         if (isMediaDemo) {
           const demoContent = `### 🎨 AI Image Generation Output

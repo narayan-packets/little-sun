@@ -83,7 +83,7 @@ function parseUserMessage(content: string): ParsedUserContent {
   // Extract markdown images
   const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
   let imgMatch: RegExpExecArray | null;
-  while ((imgMatch = imgRegex.exec(content)) !== null) {
+  while ((imgMatch = imgRegex.exec(remaining)) !== null) {
     images.push({ alt: imgMatch[1], url: imgMatch[2] });
   }
   remaining = remaining.replace(imgRegex, '').trim();
@@ -91,7 +91,7 @@ function parseUserMessage(content: string): ParsedUserContent {
   // Extract explicit audio tags e.g. [Audio: filename.mp3](url)
   const audRegex = /\[Audio:\s*([^\]]+)\]\(([^)]+)\)/gi;
   let audMatch: RegExpExecArray | null;
-  while ((audMatch = audRegex.exec(content)) !== null) {
+  while ((audMatch = audRegex.exec(remaining)) !== null) {
     audios.push({ filename: audMatch[1].trim(), url: audMatch[2].trim() });
   }
   remaining = remaining.replace(audRegex, '').trim();

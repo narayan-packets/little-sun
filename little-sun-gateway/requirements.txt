@@ -1,0 +1,4 @@
+# Optional Python dependencies for Little Sun Gateway Pocket-TTS supervisor
+pocket-tts>=0.1.0
+uvicorn>=0.30.0
+fastapi>=0.115.0

@@ -103,17 +103,60 @@ export class MediaPreprocessor {
     }
 
     if (attachment.url && /^https?:\/\//i.test(attachment.url)) {
+      const parsedUrl = new URL(attachment.url);
+      const host = parsedUrl.hostname.toLowerCase();
+      // Block SSRF to loopback, link-local, and internal addresses
+      if (
+        host === 'localhost' ||
+        host.startsWith('127.') ||
+        host.startsWith('10.') ||
+        host.startsWith('192.168.') ||
+        host === '169.254.169.254' ||
+        host === '::1' ||
+        host.startsWith('172.16.') || host.startsWith('172.17.') || host.startsWith('172.18.') ||
+        host.startsWith('172.19.') || host.startsWith('172.2') || host.startsWith('172.30.') || host.startsWith('172.31.')
+      ) {
+        throw new Error('Access to local/private network addresses is blocked.');
+      }
+
       logger.log('FILE', `Downloading ephemeral attachment: ${cleanName}`);
       const res = await fetch(attachment.url, { signal: AbortSignal.timeout(20000) });
       if (!res.ok) {
-        throw new Error(`Failed to download attachment from Supabase: HTTP ${res.status}`);
+        throw new Error(`Failed to download attachment: HTTP ${res.status}`);
       }
-      const arrayBuf = await res.arrayBuffer();
-      const buf = Buffer.from(arrayBuf);
-      fs.writeFileSync(localPath, buf);
+
+      const contentLength = Number(res.headers.get('content-length') || 0);
+      const MAX_BYTES = 50 * 1024 * 1024;
+      if (contentLength > MAX_BYTES) {
+        throw new Error('Attachment exceeds maximum allowed size of 50MB');
+      }
+
+      const fileStream = fs.createWriteStream(localPath);
+      let downloaded = 0;
+      if (res.body) {
+        const reader = res.body.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            downloaded += value.length;
+            if (downloaded > MAX_BYTES) {
+              fileStream.destroy();
+              try { fs.unlinkSync(localPath); } catch {}
+              throw new Error('Attachment exceeds maximum allowed size of 50MB');
+            }
+            fileStream.write(Buffer.from(value));
+          }
+        } finally {
+          fileStream.end();
+          try { await reader.cancel(); } catch {}
+          reader.releaseLock();
+        }
+      }
+
       const mimeType = res.headers.get('content-type') || '';
-      logger.log('FILE', `Downloaded to local disk: ${cleanName} (${buf.length} bytes)`);
-      return { localPath, cleanName, mimeType, size: buf.length };
+      logger.log('FILE', `Downloaded to local disk: ${cleanName} (${downloaded} bytes)`);
+      return { localPath, cleanName, mimeType, size: downloaded };
     }
 
     throw new Error(`Invalid attachment reference for ${cleanName}`);

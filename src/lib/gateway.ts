@@ -471,24 +471,43 @@ export async function streamGatewayChat(params: {
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) continue;
-      const jsonStr = trimmed.slice(5).trim();
-      if (!jsonStr) continue;
-      try {
-        const evt = JSON.parse(jsonStr) as ChatStreamEvent;
-        onEvent(evt);
-      } catch {
-        // ignore malformed line
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (!jsonStr) continue;
+        try {
+          const evt = JSON.parse(jsonStr) as ChatStreamEvent;
+          onEvent(evt);
+        } catch {
+          // ignore malformed line
+        }
       }
     }
+
+    if (buffer.trim().startsWith('data:')) {
+      const jsonStr = buffer.trim().slice(5).trim();
+      if (jsonStr) {
+        try {
+          const evt = JSON.parse(jsonStr) as ChatStreamEvent;
+          onEvent(evt);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {}
+    reader.releaseLock();
   }
 }

@@ -78,6 +78,7 @@ export const ChatView: React.FC = () => {
       setViewportHeight(`${Math.round(vv.height)}px`);
     };
 
+    handleResize();
     vv.addEventListener('resize', handleResize);
     return () => vv.removeEventListener('resize', handleResize);
   }, []);

@@ -173,6 +173,10 @@ export class ModelRegistry {
       }
     }
 
+    if (this.cache.size >= 100) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) this.cache.delete(oldestKey);
+    }
     this.cache.set(rawId, caps);
     return caps;
   }

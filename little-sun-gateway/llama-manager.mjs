@@ -59,6 +59,8 @@ export class LlamaManager {
     this.proc = null;
     this.idleTimer = null;
     this.idleDeadlineMs = null;
+    this.loadingPromise = null;
+    this.activeRequests = 0;
 
     try {
       if (!fs.existsSync(this.modelsDir)) {
@@ -489,6 +491,10 @@ export class LlamaManager {
   }
 
   async ensureLoaded(modelId, onColdStart, chatId = null) {
+    if (this.loadingPromise) {
+      await this.loadingPromise;
+    }
+
     const modelCfg = this.getModelConfig(modelId);
     if (!modelCfg) {
       throw new Error(
@@ -512,100 +518,129 @@ export class LlamaManager {
       return modelCfg;
     }
 
-    if (this.proc || this.currentModelId !== modelCfg.id) {
-      await this.unload();
-    }
+    this.loadingPromise = (async () => {
+      if (this.proc || this.currentModelId !== modelCfg.id) {
+        await this.unload();
+      }
 
-    this.activeChatId = chatId || null;
+      this.activeChatId = chatId || null;
 
-    this.state = 'loading';
-    this.currentModelId = modelCfg.id;
-    this.currentModelName = modelCfg.name;
-    if (typeof onColdStart === 'function') {
-      onColdStart();
-    }
+      this.state = 'loading';
+      this.currentModelId = modelCfg.id;
+      this.currentModelName = modelCfg.name;
+      if (typeof onColdStart === 'function') {
+        onColdStart();
+      }
 
-    if (modelCfg.file && /whisper/i.test(modelCfg.file)) {
-      throw new Error(
-        `Whisper model "${modelCfg.name}" is an audio transcription model and cannot be hosted via llama-server. Please select a chat-compatible LLM.`
-      );
-    }
+      if (modelCfg.file && /whisper/i.test(modelCfg.file)) {
+        throw new Error(
+          `Whisper model "${modelCfg.name}" is an audio transcription model and cannot be hosted via llama-server. Please select a chat-compatible LLM.`
+        );
+      }
 
-    const loadStart = Date.now();
-    logger.log('LLM', `Cold-starting llama-server with model "${modelCfg.name}" (${modelCfg.file})...`);
+      const loadStart = Date.now();
+      logger.log('LLM', `Cold-starting llama-server with model "${modelCfg.name}" (${modelCfg.file})...`);
 
-    const binPath = this.resolveGatewayPath(this.llamaBin);
-    const args = [
-      '-m',
-      modelPath,
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(this.llamaPort),
-      '-c',
-      String(modelCfg.contextSize || 16384),
-      '-t',
-      String(modelCfg.threads || 4),
-      '-np',
-      '1',
-    ];
+      const binPath = this.resolveGatewayPath(this.llamaBin);
+      const args = [
+        '-m',
+        modelPath,
+        '--host',
+        '127.0.0.1',
+        '--port',
+        String(this.llamaPort),
+        '-c',
+        String(modelCfg.contextSize || 16384),
+        '-t',
+        String(modelCfg.threads || 4),
+        '-np',
+        '1',
+      ];
 
-    // Detect and attach multimodal vision projector (--mmproj) if explicitly configured or matches architecture
-    let mmprojPath = null;
-    if (typeof modelCfg.mmproj === 'string' && modelCfg.mmproj.trim()) {
-      const resolved = this.resolveGatewayPath(modelCfg.mmproj);
-      if (fs.existsSync(resolved)) mmprojPath = resolved;
-    }
-    if (!mmprojPath && modelCfg.file) {
-      try {
-        const baseFileName = path.basename(modelCfg.file, path.extname(modelCfg.file)).toLowerCase();
-        const isVisionCapable = baseFileName.includes('gemma-4') || baseFileName.includes('gemma4') ||
-                                baseFileName.includes('llava') || baseFileName.includes('qwen2-vl');
-        if (isVisionCapable) {
-          const entries = fs.readdirSync(this.modelsDir);
-          const mmMatch = entries.find((e) => {
-            const eLower = e.toLowerCase();
-            if (!eLower.includes('mmproj') || !eLower.endsWith('.gguf')) return false;
-            if (baseFileName.includes('e4b') && eLower.includes('e4b')) return true;
-            if (baseFileName.includes('e2b') && eLower.includes('e2b')) return true;
-            if (baseFileName.includes('qwen') && eLower.includes('qwen')) return true;
-            if (baseFileName.includes('llava') && eLower.includes('llava')) return true;
-            return false;
-          });
-          if (mmMatch) {
-            mmprojPath = path.join(this.modelsDir, mmMatch);
+      // Detect and attach multimodal vision projector (--mmproj) if explicitly configured or matches architecture
+      let mmprojPath = null;
+      if (typeof modelCfg.mmproj === 'string' && modelCfg.mmproj.trim()) {
+        const resolved = this.resolveGatewayPath(modelCfg.mmproj);
+        if (fs.existsSync(resolved)) mmprojPath = resolved;
+      }
+      if (!mmprojPath && modelCfg.file) {
+        try {
+          const baseFileName = path.basename(modelCfg.file, path.extname(modelCfg.file)).toLowerCase();
+          const isVisionCapable = baseFileName.includes('gemma-4') || baseFileName.includes('gemma4') ||
+                                  baseFileName.includes('llava') || baseFileName.includes('qwen2-vl');
+          if (isVisionCapable) {
+            const entries = fs.readdirSync(this.modelsDir);
+            const mmMatch = entries.find((e) => {
+              const eLower = e.toLowerCase();
+              if (!eLower.includes('mmproj') || !eLower.endsWith('.gguf')) return false;
+              if (baseFileName.includes('e4b') && eLower.includes('e4b')) return true;
+              if (baseFileName.includes('e2b') && eLower.includes('e2b')) return true;
+              if (baseFileName.includes('qwen') && eLower.includes('qwen')) return true;
+              if (baseFileName.includes('llava') && eLower.includes('llava')) return true;
+              return false;
+            });
+            if (mmMatch) {
+              mmprojPath = path.join(this.modelsDir, mmMatch);
+            }
+          }
+        } catch {}
+      }
+      if (mmprojPath) {
+        args.push('--mmproj', mmprojPath);
+        logger.log('LLM', `Attached multimodal vision projector: ${path.basename(mmprojPath)}`);
+      }
+
+      const child = spawn(binPath, args, {
+        stdio: ['ignore', 'ignore', 'pipe'],
+        windowsHide: true,
+      });
+
+      let lastStderr = '';
+      child.stderr?.on('data', (d) => {
+        const s = d.toString();
+        lastStderr = (lastStderr + s).slice(-1000);
+      });
+
+      child.on('error', (err) => {
+        logger.log('ERR', `Failed to spawn llama-server: ${err.message}`);
+        if (this.proc === child) {
+          this.proc = null;
+          this.currentModelId = null;
+          this.currentModelName = null;
+          this.state = 'unloaded';
+          this.clearIdleTimer();
+        }
+      });
+
+      this.proc = child;
+
+      child.on('exit', (code) => {
+        if (this.proc === child) {
+          this.proc = null;
+          this.currentModelId = null;
+          this.currentModelName = null;
+          this.state = 'unloaded';
+          this.clearIdleTimer();
+          if (code && code !== 0) {
+            logger.log('LLM', `llama-server exited (code=${code}): ${lastStderr.trim()}`);
+          } else {
+            logger.log('LLM', `llama-server process exited (code=${code ?? 0})`);
           }
         }
-      } catch {}
+      });
+
+      await this.waitForHealth(90000);
+      this.state = 'ready';
+      const elapsedSec = ((Date.now() - loadStart) / 1000).toFixed(1);
+      logger.log('LLM', `Model "${modelCfg.name}" loaded and ready in ${elapsedSec}s`);
+      return modelCfg;
+    })();
+
+    try {
+      return await this.loadingPromise;
+    } finally {
+      this.loadingPromise = null;
     }
-    if (mmprojPath) {
-      args.push('--mmproj', mmprojPath);
-      logger.log('LLM', `Attached multimodal vision projector: ${path.basename(mmprojPath)}`);
-    }
-
-    const child = spawn(binPath, args, {
-      stdio: ['ignore', 'ignore', 'ignore'],
-      windowsHide: true,
-    });
-
-    this.proc = child;
-
-    child.on('exit', (code) => {
-      if (this.proc === child) {
-        this.proc = null;
-        this.currentModelId = null;
-        this.currentModelName = null;
-        this.state = 'unloaded';
-        this.clearIdleTimer();
-        logger.log('LLM', `llama-server process exited (code=${code ?? 0})`);
-      }
-    });
-
-    await this.waitForHealth(90000);
-    this.state = 'ready';
-    const elapsedSec = ((Date.now() - loadStart) / 1000).toFixed(1);
-    logger.log('LLM', `Model "${modelCfg.name}" loaded and ready in ${elapsedSec}s`);
-    return modelCfg;
   }
 
   async waitForHealth(timeoutMs = 90000) {
@@ -632,16 +667,20 @@ export class LlamaManager {
   }
 
   beginProcessing() {
+    this.activeRequests = (this.activeRequests || 0) + 1;
     this.clearIdleTimer();
     this.state = 'processing';
   }
 
   finishProcessing() {
-    if (this.proc) {
-      this.state = 'ready';
-      this.startIdleTimer();
-    } else {
-      this.state = 'unloaded';
+    this.activeRequests = Math.max(0, (this.activeRequests || 1) - 1);
+    if (this.activeRequests === 0) {
+      if (this.proc) {
+        this.state = 'ready';
+        this.startIdleTimer();
+      } else {
+        this.state = 'unloaded';
+      }
     }
   }
 }

@@ -414,8 +414,9 @@ export const AudioCard: React.FC<AudioCardProps> = ({ src, title = 'Generated Au
       el.pause();
       setIsPlaying(false);
     } else {
-      el.play();
-      setIsPlaying(true);
+      el.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false));
     }
   };
 
@@ -485,6 +486,7 @@ export const AudioCard: React.FC<AudioCardProps> = ({ src, title = 'Generated Au
         onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
         onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
         onEnded={() => setIsPlaying(false)}
+        onError={() => setIsPlaying(false)}
       />
 
       <div className="p-3 sm:p-3.5 flex items-center gap-3">
@@ -571,6 +573,26 @@ export const SvgCard: React.FC<SvgCardProps> = ({ code, title = 'Vector Graphic 
   const cleanTitle = title.trim() || 'vector-graphic';
   const fileName = `little-sun-${cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32)}-${Date.now()}.svg`;
 
+  const safeSvgHtml = useMemo(() => {
+    if (!code || typeof DOMParser === 'undefined') return code;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(code, 'image/svg+xml');
+      const scripts = doc.querySelectorAll('script');
+      scripts.forEach((s) => s.remove());
+      doc.querySelectorAll('*').forEach((el) => {
+        for (const attr of Array.from(el.attributes)) {
+          if (attr.name.toLowerCase().startsWith('on') || attr.value.trim().toLowerCase().startsWith('javascript:')) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      });
+      return doc.documentElement?.outerHTML || code;
+    } catch {
+      return code;
+    }
+  }, [code]);
+
   const handleDownload = () => {
     downloadTextAsFile(code, fileName, 'image/svg+xml');
   };
@@ -650,7 +672,7 @@ export const SvgCard: React.FC<SvgCardProps> = ({ code, title = 'Vector Graphic 
         <div
           className="p-4 sm:p-6 flex items-center justify-center max-h-[420px] overflow-hidden"
           style={{ backgroundColor: 'var(--surface)' }}
-          dangerouslySetInnerHTML={{ __html: code }}
+          dangerouslySetInnerHTML={{ __html: safeSvgHtml }}
         />
       )}
     </div>

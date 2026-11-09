@@ -136,10 +136,11 @@ export function syncOllamaModel(key) {
     return;
   }
 
-  const baseModelPath = path.join(MODELS_DIR, baseModel);
+  const baseModelPath = path.join(MODELS_DIR, baseModel).replace(/\\/g, '/');
+  const normalizedMmproj = mmprojPath.replace(/\\/g, '/');
   const modelfileContent = [
     `FROM ${baseModelPath}`,
-    `FROM ${mmprojPath}`,
+    `FROM ${normalizedMmproj}`,
     `TEMPLATE {{ .Prompt }}`,
     `RENDERER ${info.family}`,
     `PARSER ${info.family}`,

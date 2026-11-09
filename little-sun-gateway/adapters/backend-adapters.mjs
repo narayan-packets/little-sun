@@ -513,9 +513,20 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
           }
         }
       }
+    } finally {
+      try { await reader.cancel(); } catch {}
+      reader.releaseLock();
+    }
 
+    try {
       // 5. If Native Tool Call was triggered, execute tool and initiate follow-up pass
       if (accumulatedToolCalls.length > 0 && typeof searchFn === 'function') {
+        ollamaMessages.push({
+          role: 'assistant',
+          content: '',
+          tool_calls: accumulatedToolCalls,
+        });
+
         for (const call of accumulatedToolCalls) {
           if (call.function?.name === 'search_web') {
             let callQuery = '';
@@ -546,12 +557,6 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
               }
 
               ollamaMessages.push({
-                role: 'assistant',
-                content: '',
-                tool_calls: accumulatedToolCalls,
-              });
-
-              ollamaMessages.push({
                 role: 'tool',
                 content: JSON.stringify({ results: searchResults }),
               });
@@ -579,31 +584,36 @@ export class OllamaBackendAdapter extends BaseBackendAdapter {
         if (res2.ok && res2.body) {
           const reader2 = res2.body.getReader();
           let buffer2 = '';
-          while (true) {
-            const { done, value } = await reader2.read();
-            if (done) break;
-            buffer2 += decoder.decode(value, { stream: true });
-            const lines2 = buffer2.split('\n');
-            buffer2 = lines2.pop() || '';
+          try {
+            while (true) {
+              const { done, value } = await reader2.read();
+              if (done) break;
+              buffer2 += decoder.decode(value, { stream: true });
+              const lines2 = buffer2.split('\n');
+              buffer2 = lines2.pop() || '';
 
-            for (const line of lines2) {
-              const trimmed = line.trim();
-              if (!trimmed) continue;
-              try {
-                const chunk2 = JSON.parse(trimmed);
-                if (chunk2.message?.thinking) {
-                  if (thinking !== false && typeof onThinking === 'function') {
-                    onThinking(chunk2.message.thinking);
+              for (const line of lines2) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                try {
+                  const chunk2 = JSON.parse(trimmed);
+                  if (chunk2.message?.thinking) {
+                    if (thinking !== false && typeof onThinking === 'function') {
+                      onThinking(chunk2.message.thinking);
+                    }
                   }
+                  const tok2 = chunk2.message?.content;
+                  if (typeof tok2 === 'string' && tok2.length > 0) {
+                    thinkFilter.feedContent(tok2);
+                  }
+                } catch {
+                  // ignore
                 }
-                const tok2 = chunk2.message?.content;
-                if (typeof tok2 === 'string' && tok2.length > 0) {
-                  thinkFilter.feedContent(tok2);
-                }
-              } catch {
-                // ignore
               }
             }
+          } finally {
+            try { await reader2.cancel(); } catch {}
+            reader2.releaseLock();
           }
         }
       }
@@ -815,6 +825,14 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
       thinkingEnabled: thinking !== false,
     });
 
+    let processingFinished = false;
+    const safeFinish = () => {
+      if (!processingFinished) {
+        processingFinished = true;
+        this.llama.finishProcessing();
+      }
+    };
+
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -858,12 +876,16 @@ export class LlamaServerAdapter extends BaseBackendAdapter {
         if (typeof onToken === 'function') onToken(sourcesBlock);
       }
 
-      this.llama.finishProcessing();
+      safeFinish();
       if (typeof onDone === 'function') onDone(tokenCount);
     } catch (err) {
-      this.llama.finishProcessing();
+      safeFinish();
       if (signal?.aborted) return;
       if (typeof onError === 'function') onError(err.message);
+    } finally {
+      safeFinish();
+      try { await reader.cancel(); } catch {}
+      reader.releaseLock();
     }
   }
 }

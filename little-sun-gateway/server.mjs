@@ -215,6 +215,14 @@ const userRateMap = new Map();
 
 function checkRateLimit(userId) {
   const now = Date.now();
+  // Bound map size to prevent unbounded memory leak
+  if (userRateMap.size > 1000) {
+    for (const [id, times] of userRateMap.entries()) {
+      if (times.length === 0 || now - times[times.length - 1] > RATE_WINDOW_MS) {
+        userRateMap.delete(id);
+      }
+    }
+  }
   const timestamps = (userRateMap.get(userId) || []).filter((t) => now - t < RATE_WINDOW_MS);
   if (timestamps.length >= RATE_MAX_REQUESTS) {
     userRateMap.set(userId, timestamps);
@@ -285,7 +293,12 @@ function readJsonBody(req, maxBytes = MAX_CHAT_PAYLOAD_BYTES) {
 }
 
 function writeSse(res, obj) {
-  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+  if (!res || res.writableEnded || res.destroyed) return;
+  try {
+    res.write(`data: ${JSON.stringify(obj)}\n\n`);
+  } catch {
+    // client connection interrupted/closed
+  }
 }
 
 let isChatBusy = false;
@@ -573,52 +586,50 @@ const server = http.createServer(async (req, res) => {
     }
 
     isChatBusy = true;
-    const upstreamAbort = new AbortController();
-    let clientClosed = false;
-
-    res.on('close', () => {
-      if (!res.writableEnded) {
-        clientClosed = true;
-        upstreamAbort.abort();
-      }
-    });
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Connection: 'keep-alive',
-    });
-
-    const genStart = Date.now();
-    const chatId = typeof body.chatId === 'string' ? body.chatId.trim() : null;
-    logger.log(
-      'LLM',
-      `Chat stream started (model=${body.model || 'default'}, chat=${(chatId || 'new').slice(0, 8)}, context_msgs=${sanitizedMessages.length})`
-    );
-
     const tempTracker = new TempTracker();
-    const supabaseFilesToDelete = [];
+    let clientClosed = false;
+    const upstreamAbort = new AbortController();
 
-    // Ephemeral attachments: ONLY download files attached to this specific request turn (never historic turns)
-    const attachmentsList = [];
-    if (Array.isArray(body.attachments) && body.attachments.length > 0) {
-      attachmentsList.push(...body.attachments);
-    } else {
-      // Fallback: check ONLY the most recent user message in the conversation
-      const lastUserMsg = [...sanitizedMessages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg && typeof lastUserMsg.content === 'string') {
-        const urlMatches = lastUserMsg.content.matchAll(/!?\[(.*?)\]\(((?:https?:\/\/)[^\s\)]+)\)/g);
-        for (const match of urlMatches) {
-          const name = match[1] || 'attachment';
-          const url = match[2];
-          if (!attachmentsList.some((a) => a.url === url)) {
-            attachmentsList.push({ name, url });
+    try {
+      res.on('close', () => {
+        if (!res.writableEnded) {
+          clientClosed = true;
+          upstreamAbort.abort();
+        }
+      });
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Connection: 'keep-alive',
+      });
+
+      const genStart = Date.now();
+      const chatId = typeof body.chatId === 'string' ? body.chatId.trim() : null;
+      logger.log(
+        'LLM',
+        `Chat stream started (model=${body.model || 'default'}, chat=${(chatId || 'new').slice(0, 8)}, context_msgs=${sanitizedMessages.length})`
+      );
+
+      // Ephemeral attachments: ONLY download files attached to this specific request turn (never historic turns)
+      const attachmentsList = [];
+      if (Array.isArray(body.attachments) && body.attachments.length > 0) {
+        attachmentsList.push(...body.attachments);
+      } else {
+        // Fallback: check ONLY the most recent user message in the conversation
+        const lastUserMsg = [...sanitizedMessages].reverse().find((m) => m.role === 'user');
+        if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+          const urlMatches = lastUserMsg.content.matchAll(/!?\[(.*?)\]\(((?:https?:\/\/)[^\s\)]+)\)/g);
+          for (const match of urlMatches) {
+            const name = match[1] || 'attachment';
+            const url = match[2];
+            if (!attachmentsList.some((a) => a.url === url)) {
+              attachmentsList.push({ name, url });
+            }
           }
         }
       }
-    }
 
-    try {
       // 1. Dynamic Model Capability Detection (Ollama /api/show & local registry)
       const modelCaps = await modelRegistry.getModelCapabilities(body.model);
 
@@ -745,26 +756,6 @@ const server = http.createServer(async (req, res) => {
     } finally {
       // Deterministic ephemeral cleanup: local disk temp files (tracked via TempTracker)
       tempTracker.cleanup();
-
-      // Ephemeral cleanup: delete uploaded files from Supabase Storage
-      if (supabaseFilesToDelete.length > 0 && req.headers.authorization && process.env.SUPABASE_URL) {
-        for (const sPath of supabaseFilesToDelete) {
-          try {
-            await fetch(`${process.env.SUPABASE_URL}/storage/v1/object/chat-uploads`, {
-              method: 'DELETE',
-              headers: {
-                Authorization: req.headers.authorization,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ prefixes: [sPath] }),
-            });
-            logger.log('CLEANUP', `Cleaned up Supabase storage file: ${sPath}`);
-          } catch (supaErr) {
-            logger.log('WARN', `Failed to delete Supabase ephemeral file: ${supaErr.message}`);
-          }
-        }
-      }
-
       isChatBusy = false;
       if (!res.writableEnded) {
         res.end();
@@ -815,3 +806,12 @@ const cleanShutdown = async () => {
 
 process.on('SIGINT', cleanShutdown);
 process.on('SIGTERM', cleanShutdown);
+
+process.on('uncaughtException', async (err) => {
+  logger.log('ERR', `Uncaught exception: ${err?.stack || err}`);
+  await cleanShutdown();
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.log('ERR', `Unhandled rejection: ${reason?.stack || reason}`);
+});

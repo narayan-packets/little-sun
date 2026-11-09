@@ -356,12 +356,43 @@ export async function streamCloudChat(params: StreamCloudChatParams): Promise<st
 
   return new Promise<string>((resolve, reject) => {
     let animationFrameId: number | null = null;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
     let lastRenderTime = performance.now();
+    let settled = false;
+
+    const cleanup = () => {
+      settled = true;
+      if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+      if (timerId !== null) clearTimeout(timerId);
+      if (signal) signal.removeEventListener('abort', onAbort);
+    };
+
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+
+    if (signal) {
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    const scheduleNext = () => {
+      if (settled) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        timerId = setTimeout(tick, 16);
+      } else {
+        animationFrameId = requestAnimationFrame(tick);
+      }
+    };
 
     const tick = () => {
+      if (settled) return;
       if (signal?.aborted) {
-        if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
-        reject(new DOMException('Aborted', 'AbortError'));
+        onAbort();
         return;
       }
 
@@ -369,11 +400,13 @@ export async function streamCloudChat(params: StreamCloudChatParams): Promise<st
       const elapsed = now - lastRenderTime;
 
       // Pacing interval: 14-20ms per step, dynamically accelerating if queue grows
-      const targetInterval = tokenQueue.length > 50 ? 5 : tokenQueue.length > 20 ? 10 : 18;
+      // If tab is in background or stream is done, flush immediately
+      const isHidden = typeof document !== 'undefined' && document.hidden;
+      const targetInterval = isHidden ? 0 : tokenQueue.length > 50 ? 5 : tokenQueue.length > 20 ? 10 : 18;
 
-      if (elapsed >= targetInterval && tokenQueue.length > 0) {
+      if ((elapsed >= targetInterval || isHidden) && tokenQueue.length > 0) {
         lastRenderTime = now;
-        const batchCount = tokenQueue.length > 100 ? 6 : tokenQueue.length > 40 ? 3 : 1;
+        const batchCount = isHidden ? tokenQueue.length : tokenQueue.length > 100 ? 6 : tokenQueue.length > 40 ? 3 : 1;
         for (let i = 0; i < batchCount && tokenQueue.length > 0; i++) {
           const piece = tokenQueue.shift()!;
           fullAccumulated += piece;
@@ -382,6 +415,7 @@ export async function streamCloudChat(params: StreamCloudChatParams): Promise<st
       }
 
       if (isStreamFinished && tokenQueue.length === 0) {
+        cleanup();
         if (hasError) {
           reject(hasError);
         } else {
@@ -390,10 +424,10 @@ export async function streamCloudChat(params: StreamCloudChatParams): Promise<st
         return;
       }
 
-      animationFrameId = requestAnimationFrame(tick);
+      scheduleNext();
     };
 
-    animationFrameId = requestAnimationFrame(tick);
+    scheduleNext();
 
     // Asynchronous network stream reader
     (async () => {
